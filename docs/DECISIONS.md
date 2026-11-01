@@ -43,3 +43,14 @@ requirement.
 | 27 | Android widget / quick actions | Android **app shortcut** ("Drafts waiting") + share target via Capacitor intent filter; a home-screen *widget* is listed in ASSETS-NEEDED/roadmap | A native widget needs Kotlin code outside Capacitor; the shortcut covers the use case in v1. |
 | 28 | Eval harness | CLI script producing a Markdown + HTML side-by-side report | No extra service. Runs in mock mode with fixtures, or against real mail. |
 | 29 | Time zone | `America/Toronto` default, setting in app | Ottawa. |
+| 30 | Google scopes | `gmail.modify`, `calendar.readonly`, `calendar.events` (+ `openid email`) | `gmail.modify` already covers reading, drafts, labels and sending a draft, so separate `gmail.readonly`/`compose`/`send`/`labels` scopes would add nothing. Sending is still only reachable from the confirmed Send route. |
+| 31 | Draft editor | Plain-text editor; the email goes out as text plus a simple HTML version (paragraphs + your Gmail HTML signature) | Rich-text editing (bold, links) adds a lot of complexity for little benefit in replies. Can be added later without changing the backend. |
+| 32 | Retention | Purge bodies of all mail after N days, but keep the cleaned text of *your own* sent replies | Those are your words and power the "voice examples"; other people's content is removed. |
+| 33 | Contacts import | Not in v1; profile seeding uses your sent mail only | The Contacts API needs another Google scope; sent mail already finds the people you write to. |
+| 34 | Older thread messages | Summarised deterministically (date, sender, first ~200 characters) when the thread exceeds the budget | No extra model call or cost; the newest messages are always included in full. |
+| 35 | Thread state after you reply | A thread whose latest message is yours moves to "Done"; a new incoming message re-opens it | Keeps the inbox to things waiting on you. |
+| 36 | First-run security | One-time setup code printed in the server log (or `SETUP_CODE`) | Stops someone who finds the URL first from claiming the account. |
+| 37 | Placeholders block sending | A draft containing `[CONFIRM: …]` cannot be sent | Prevents sending a draft with unresolved facts. |
+| 38 | Model JSON | Structured outputs plus `effort` per model; no `temperature` | Current models reject sampling parameters; effort is the supported knob. |
+| 39 | Android widget | App shortcut ("Drafts waiting") + share target; no home-screen widget in v1 | A widget needs native Kotlin UI; listed for later. |
+| 40 | Verification limits in this build environment | APK build and Docker image build scripted but **not executed here** (no Android SDK download / no Docker daemon in the build sandbox); the production Node build was run and verified | Honest status; see TESTING.md device checklist. |
