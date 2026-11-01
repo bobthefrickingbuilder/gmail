@@ -1,0 +1,35 @@
+{
+  "_comment": "Model mapping. The ONLY place model IDs appear. Prices are USD per million tokens; update when Anthropic changes pricing.",
+  "default_draft_model": "haiku",
+  "triage_model": "haiku",
+  "profile_model": "haiku",
+  "learning_model": "sonnet",
+  "escalation_order": ["haiku", "sonnet", "opus"],
+  "models": {
+    "haiku": {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku",
+      "input_per_mtok": 0.10,
+      "output_per_mtok": 0.50,
+      "effort": "medium",
+      "serverFallback": false
+    },
+    "sonnet": {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet",
+      "input_per_mtok": 2.00,
+      "output_per_mtok": 10.00,
+      "effort": "medium",
+      "serverFallback": true
+    },
+    "opus": {
+      "id": "claude-opus-5-5",
+      "label": "Opus",
+      "input_per_mtok": 4.00,
+      "output_per_mtok": 20.00,
+      "effort": "medium",
+      "serverFallback": true
+    }
+  },
+  "max_output_tokens": { "draft": 8000, "triage": 1500, "profile": 3000, "learn": 6000 }
+}

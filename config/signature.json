@@ -1,0 +1,19 @@
+{
+  "_comment": "Fallback signatures, used only when the Gmail send-as signature cannot be fetched. Choose per person in their profile (signature group).",
+  "default": "default",
+  "groups": {
+    "default": {
+      "label": "Standard",
+      "text": "Matthew Menard\n613-863-9796\n© 2026 Matthew Menard. All rights reserved."
+    },
+    "oryc": {
+      "label": "Ottawa Regional Youth Choir",
+      "text": "Matthew Menard\nAssistant Conductor, Ottawa Regional Youth Choir\n613-863-9796\n© 2026 Matthew Menard. All rights reserved."
+    },
+    "casual": {
+      "label": "Casual (friends)",
+      "text": "Matthew"
+    }
+  },
+  "prefer_gmail_signature": true
+}
