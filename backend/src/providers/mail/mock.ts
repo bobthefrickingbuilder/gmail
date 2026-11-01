@@ -6,7 +6,7 @@
 import { makeGmailMessage, inboxFixtures, sentFixtures, MOCK_OWNER, type FixtureSpec } from "./fixtures.js";
 import { HistoryExpiredError, type MailProvider, type SendAs } from "./types.js";
 import type { GmailMessage } from "../../mail/types.js";
-import { b64urlDecode } from "../../mail/parse.js";
+
 
 export class MockMailProvider implements MailProvider {
   readonly kind = "mock";
@@ -103,5 +103,5 @@ export class MockMailProvider implements MailProvider {
     return { messageId: `sent-${draftId}`, threadId: d.threadId };
   }
   /** Helper for tests: decoded MIME of a draft. */
-  draftMime(draftId: string) { const d = this.drafts.get(draftId); return d ? b64urlDecode(d.raw).toString("utf8") : null; }
+  draftMime(draftId: string) { return this.drafts.get(draftId)?.raw ?? null; }
 }

@@ -8,7 +8,7 @@ import type { LlmProvider, LlmRequest, LlmResult } from "./types.js";
 import { getModels } from "../../settings.js";
 import { priceFor } from "../../usage/cost.js";
 
-export const INJECTION_RE = /(ignore (all |any )?(previous|prior|above) (instructions|prompts)|disregard (your|the) (instructions|rules)|you are (now )?(an? )?(ai|assistant|chatbot)|system prompt|as an ai|forward (this|all|every) (email|message)s?|send (me )?(the|your) (password|credentials|api key)|new instructions:|<\/?system>|assistant:)/i;
+import { INJECTION_RE } from "../../security/injection.js";
 
 function latestEmail(user: string): { from: string; subject: string; body: string } {
   const m = user.match(/<email index="1" from="([^"]*)" date="[^"]*" subject="([^"]*)">\n([\s\S]*?)\n<\/email>/)

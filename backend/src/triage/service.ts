@@ -13,7 +13,7 @@ import { buildTriageSystem, buildTriageUser } from "../drafting/prompt.js";
 import { recordUsage } from "../usage/cost.js";
 import { loadParsed } from "../mail/store.js";
 import { audit } from "../audit.js";
-import { INJECTION_RE } from "../providers/llm/mock.js";
+import { INJECTION_RE } from "../security/injection.js";
 import { parseIcs } from "../mail/ics.js";
 import { todayString } from "../time.js";
 

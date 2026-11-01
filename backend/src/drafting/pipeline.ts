@@ -27,7 +27,7 @@ import { AI_LABELS, applyThreadLabels, writeDraftToGmail } from "./gmail.js";
 import { audit, type Actor } from "../audit.js";
 import { emit } from "../notify/sse.js";
 import { todayString } from "../time.js";
-import { INJECTION_RE } from "../providers/llm/mock.js";
+import { INJECTION_RE } from "../security/injection.js";
 import { log } from "../log.js";
 import type { Address } from "../mail/types.js";
 import type { DraftVersionsTable } from "../db/schema.js";

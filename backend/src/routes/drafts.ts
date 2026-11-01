@@ -22,7 +22,7 @@ import { getModels, getSettings, getStyleGuide } from "../settings.js";
 import { recordUsage } from "../usage/cost.js";
 import { todayString } from "../time.js";
 import { postCheck } from "../drafting/postcheck.js";
-import { INJECTION_RE } from "../providers/llm/mock.js";
+import { INJECTION_RE } from "../security/injection.js";
 
 const Address = z.object({ name: z.string().nullable(), email: z.string().email() });
 

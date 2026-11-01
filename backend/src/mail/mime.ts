@@ -89,7 +89,7 @@ export interface ReplyInput {
 }
 
 /** Returns the full RFC 2822 message as a string (caller base64url-encodes for Gmail). */
-export function buildReplyMime(r: ReplyInput, boundarySeed = crypto.randomUUID()): string {
+export function buildReplyMime(r: ReplyInput, boundarySeed: string = crypto.randomUUID()): string {
   const boundary = `=_assistant_${boundarySeed.replace(/-/g, "")}`;
   const sigText = r.signatureText ?? (r.signatureHtml ? htmlToText(r.signatureHtml) : null);
   const plain = sigText ? `${r.bodyText.trimEnd()}\n\n${sigText}` : r.bodyText;
