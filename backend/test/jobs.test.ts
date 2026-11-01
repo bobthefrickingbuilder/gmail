@@ -61,7 +61,7 @@ describe("notifications", () => {
   it("payload carries sender + subject only, truncated", () => {
     const p = safePayload({ title: "Claire Dubois", body: "Subject line ".repeat(30) });
     expect(p.body.length).toBeLessThanOrEqual(120);
-    expect(Object.keys(p).filter((k) => (p as Record<string, unknown>)[k] !== undefined).sort()).toEqual(["body", "title"]);
+    expect(Object.keys(p).filter((k) => (p as unknown as Record<string, unknown>)[k] !== undefined).sort()).toEqual(["body", "title"]);
   });
   it("quiet hours wrap midnight", () => {
     const q = { start: "22:00", end: "07:30" };

@@ -32,7 +32,7 @@ import { log } from "./log.js";
 
 /** Routes that do not need a login. Everything else under /api does. */
 const PUBLIC = [/^\/api\/health$/, /^\/api\/auth\/(status|setup|login|refresh|passkey\/login\/(options|verify))$/, /^\/api\/google\/callback/,
-  /^\/api\/app\/version$/, /^\/api\/events$/, /^\/api\/webhooks\//];
+  /^\/api\/app\/version$/, /^\/api\/events$/, /^\/api\/webhooks\//, /^\/api\/cron\/poll$/];
 
 export async function buildServer(): Promise<FastifyInstance> {
   const e = env();

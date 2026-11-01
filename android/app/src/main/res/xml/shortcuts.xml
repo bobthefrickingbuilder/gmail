@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon → "Drafts waiting" -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="drafts_waiting"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_drafts">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="ca.matthewmenard.assistant"
+            android:targetClass="ca.matthewmenard.assistant.MainActivity"
+            android:data="assistant://open#/inbox?status=drafted" />
+    </shortcut>
+</shortcuts>

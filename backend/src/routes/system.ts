@@ -175,6 +175,14 @@ export async function systemRoutes(app: FastifyInstance) {
     return { ok: true, note: "Also remove access at https://myaccount.google.com/permissions" };
   });
 
+  // ---- Vercel Cron (serverless hosting has no long-running worker) ----
+  app.get("/api/cron/poll", async (req) => {
+    const secret = env().CRON_SECRET;
+    const given = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+    if (!secret || given.length !== secret.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(secret))) throw new HttpError(401, "Not allowed");
+    return pollOnce();
+  });
+
   // ---- Gmail push webhook (Pub/Sub). Not enabled in v1; polling is the baseline. ----
   app.post("/api/webhooks/gmail", async (_req, reply) => { void pollOnce(); return reply.status(204).send(); });
 

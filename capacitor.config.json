@@ -1,0 +1,15 @@
+{
+  "appId": "ca.matthewmenard.assistant",
+  "appName": "Email Assistant",
+  "webDir": "web/dist",
+  "android": {
+    "path": "android",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": { "androidScheme": "https" },
+  "plugins": {
+    "PushNotifications": { "presentationOptions": ["badge", "sound", "alert"] }
+  }
+}

@@ -78,7 +78,7 @@ function write(file, size, opts) {
   console.log("wrote", path.relative(repo, file));
 }
 function splash(file, w, h) {
-  const icon = 360, ic = render(icon, { radius: 0.22 });
+  const icon = Math.min(360, Math.floor(Math.min(w, h) * 0.4)), ic = render(icon, { radius: 0.22 });
   const buf = Buffer.alloc(w * h * 4);
   for (let i = 0; i < w * h; i++) { buf[i * 4] = CREAM[0]; buf[i * 4 + 1] = CREAM[1]; buf[i * 4 + 2] = CREAM[2]; buf[i * 4 + 3] = 255; }
   const ox = Math.floor((w - icon) / 2), oy = Math.floor((h - icon) / 2);
@@ -118,4 +118,11 @@ if (fs.existsSync(res)) {
   fs.mkdirSync(path.join(res, "values"), { recursive: true });
   fs.writeFileSync(path.join(res, "values/ic_launcher_background.xml"), `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#2F5D50</color>\n</resources>\n`);
   console.log("wrote Android adaptive icon set");
+  // Launch splash images: keep each existing file's size, redraw with our artwork.
+  for (const dir of fs.readdirSync(res).filter((d) => d.startsWith("drawable"))) {
+    const f = path.join(res, dir, "splash.png");
+    if (!fs.existsSync(f)) continue;
+    const head = fs.readFileSync(f);
+    splash(f, head.readUInt32BE(16), head.readUInt32BE(20));
+  }
 }

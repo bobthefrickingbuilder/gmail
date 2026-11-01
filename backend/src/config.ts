@@ -54,6 +54,8 @@ const EnvSchema = z.object({
   DOWNLOAD_PASSWORD: z.string().optional(),
   WEB_DIST_DIR: z.string().optional(),
   LOG_LEVEL: z.string().default("info"),
+  /** Vercel only: shared secret Vercel Cron sends to /api/cron/poll. */
+  CRON_SECRET: z.string().optional(),
   TIMEZONE: z.string().default("America/Toronto"),
 });
 

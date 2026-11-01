@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build -w web && npm run build -w backend",
+  "outputDirectory": "web/dist",
+  "functions": { "api/index.js": { "maxDuration": 60, "includeFiles": "config/**" } },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/download(.*)", "destination": "/api/index.js" }
+  ],
+  "crons": [{ "path": "/api/cron/poll", "schedule": "*/5 * * * *" }]
+}

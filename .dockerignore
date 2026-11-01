@@ -1,0 +1,10 @@
+node_modules
+*/node_modules
+web/dist
+backend/dist
+android
+.env
+data
+backups
+eval-reports
+.git

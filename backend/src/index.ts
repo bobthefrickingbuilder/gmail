@@ -3,7 +3,9 @@
  *   npm run dev        (development, auto-reload)
  *   npm run mock       (from repo root: everything fake, no credentials needed)
  */
-import { env } from "./config.js";
+import fs from "node:fs";
+import path from "node:path";
+import { env, REPO_ROOT, resetEnv } from "./config.js";
 import { getDb, now, uid } from "./db/index.js";
 import { buildServer } from "./server.js";
 import { startWorker } from "./worker/index.js";
@@ -12,6 +14,9 @@ import { log } from "./log.js";
 import { MOCK_OWNER } from "./providers/mail/fixtures.js";
 
 async function main() {
+  // Load .env from the repo root (Docker passes variables directly instead).
+  const envFile = path.join(REPO_ROOT, ".env");
+  if (fs.existsSync(envFile)) { process.loadEnvFile(envFile); resetEnv(); }
   const e = env();
   const db = await getDb();
   if (e.MOCK_MODE) {

@@ -1,0 +1,32 @@
+# Home-server deployment:  docker compose up -d
+# The app listens on 127.0.0.1:8787; put HTTPS in front of it (Caddy example below,
+# or a Cloudflare Tunnel / Tailscale Funnel — see docs/INSTALL.md).
+services:
+  assistant:
+    build: .
+    image: email-assistant:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:/data/assistant.sqlite
+      RELEASES_DIR: /data/releases
+    volumes:
+      - ./data:/data
+      - ./config:/app/config        # edit config files without rebuilding
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  # Optional HTTPS reverse proxy with automatic certificates. Set DOMAIN in .env and
+  # point the domain's DNS at this machine (ports 80/443 forwarded).
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    profiles: ["https"]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:-mail.example.com}
+    volumes:
+      - ./scripts/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+volumes:
+  caddy_data:
