@@ -1,0 +1,25 @@
+node_modules/
+dist/
+dev-dist/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+data/
+backups/
+coverage/
+eval-reports/
+# Android build output + signing material
+android/app/build/
+android/.gradle/
+android/build/
+*.keystore
+*.jks
+keystore.properties
+android/local.properties
+google-services.json
+# Google OAuth client secret downloads
+client_secret*.json
+.DS_Store

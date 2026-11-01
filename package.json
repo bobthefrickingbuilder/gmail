@@ -1,0 +1,18 @@
+{
+  "name": "gmail-assistant",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Personal AI email assistant: drafts replies, never sends on its own.",
+  "workspaces": ["backend", "web"],
+  "scripts": {
+    "dev": "npm run dev -w backend",
+    "dev:web": "npm run dev -w web",
+    "mock": "MOCK_MODE=true npm run dev -w backend",
+    "build": "npm run build -w web && npm run build -w backend",
+    "test": "npm test -w backend && npm test -w web",
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w web",
+    "eval": "npm run eval -w backend",
+    "setup": "node scripts/setup.mjs"
+  },
+  "engines": { "node": ">=22" }
+}
