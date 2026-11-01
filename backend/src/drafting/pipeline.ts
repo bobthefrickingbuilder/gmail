@@ -48,21 +48,21 @@ export async function latestIncoming(threadId: string) {
 }
 
 /** Up to 3 of Matthew's own past replies: same person first, then same category. */
-export async function retrieveExamples(personId: string | null, category: string | null, subject: string, excludeThreadId: string) {
+export async function retrieveExamples(personId: string | null, category: string | null, subject: string, excludeThreadId: string, before?: string) {
   const db = await getDb();
   const picks: { to: string; subject: string; body: string; reason: string }[] = [];
   if (personId) {
     const rows = await db.selectFrom("messages").innerJoin("threads", "threads.id", "messages.thread_id")
       .select(["messages.to_json", "messages.subject", "messages.stripped_text"])
       .where("threads.person_id", "=", personId).where("messages.is_from_me", "=", 1).where("threads.id", "!=", excludeThreadId)
-      .where("messages.stripped_text", "is not", null).orderBy("messages.date", "desc").limit(3).execute();
+      .where("messages.stripped_text", "is not", null).where("messages.date", "<", before ?? "9999").orderBy("messages.date", "desc").limit(3).execute();
     for (const r of rows) picks.push({ to: pj<Address[]>(r.to_json, [])[0]?.email ?? "", subject: r.subject, body: r.stripped_text ?? "", reason: "same person" });
   }
   if (picks.length < 3 && category) {
     const rows = await db.selectFrom("messages").innerJoin("threads", "threads.id", "messages.thread_id")
       .select(["messages.to_json", "messages.subject", "messages.stripped_text"])
       .where("threads.category", "=", category).where("messages.is_from_me", "=", 1).where("threads.id", "!=", excludeThreadId)
-      .where("messages.stripped_text", "is not", null).orderBy("messages.date", "desc").limit(20).execute();
+      .where("messages.stripped_text", "is not", null).where("messages.date", "<", before ?? "9999").orderBy("messages.date", "desc").limit(20).execute();
     const words = new Set(subject.toLowerCase().split(/\W+/).filter((w) => w.length > 3));
     const scored = rows.map((r) => ({ r, score: r.subject.toLowerCase().split(/\W+/).filter((w) => words.has(w)).length }))
       .sort((a, b) => b.score - a.score);
@@ -72,10 +72,10 @@ export async function retrieveExamples(personId: string | null, category: string
   return picks.filter((p) => p.body.trim());
 }
 
-export async function draftThread(threadId: string, opts: DraftOptions) {
+/** Everything the model needs for one draft, gathered from the database and calendar. Pure read: no writes. */
+export async function buildDraftContext(threadId: string, opts: { replyToMessageId?: string; instruction?: string | null; shareScheduleDetails?: boolean; useExistingDraft?: boolean }) {
   const db = await getDb();
   const settings = await getSettings();
-  const models = await getModels();
   const thread = await db.selectFrom("threads").selectAll().where("id", "=", threadId).executeTakeFirstOrThrow();
   const acc = await db.selectFrom("accounts").selectAll().where("id", "=", thread.account_id).executeTakeFirstOrThrow();
   const targetRow = opts.replyToMessageId
@@ -84,14 +84,10 @@ export async function draftThread(threadId: string, opts: DraftOptions) {
   if (!targetRow) throw new Error("This thread has no incoming message to reply to");
   const target = await loadParsed(targetRow.id);
   const mine = myAddresses(acc);
-
-  const existing = await db.selectFrom("drafts").selectAll().where("thread_id", "=", threadId).where("status", "in", ["active", "saved"])
-    .orderBy("created_at", "desc").executeTakeFirst();
-  const modelKey = opts.modelKey ?? models.default_draft_model;
-  if (!models.models[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
+  const existing = opts.useExistingDraft === false ? undefined : await db.selectFrom("drafts").selectAll().where("thread_id", "=", threadId)
+    .where("status", "in", ["active", "saved"]).orderBy("created_at", "desc").executeTakeFirst();
   const shareDetails = opts.shareScheduleDetails ?? (existing?.share_schedule_details === 1);
 
-  // ---- context ----
   const msgs = await db.selectFrom("messages").selectAll().where("thread_id", "=", threadId).where("date", "<=", target.date)
     .orderBy("date", "desc").limit(40).execute();
   const promptThread: PromptMessage[] = msgs.map((m) => ({
@@ -100,7 +96,7 @@ export async function draftThread(threadId: string, opts: DraftOptions) {
   }));
   const person = thread.person_id ? await db.selectFrom("people").selectAll().where("id", "=", thread.person_id).executeTakeFirst() : undefined;
   const pinned = person ? await db.selectFrom("pinned_docs").select(["title", "content"]).where("person_id", "=", person.id).execute() : [];
-  const examples = await retrieveExamples(person?.id ?? null, thread.category, thread.subject, threadId);
+  const examples = await retrieveExamples(person?.id ?? null, thread.category, thread.subject, threadId, target.date);
 
   let availability: { timezone: string; slots: { start: string; end: string; label: string }[]; details?: string[] } | null = null;
   let eventSummaries: string[] = [];
@@ -126,18 +122,36 @@ export async function draftThread(threadId: string, opts: DraftOptions) {
   const cc = existing ? pj<Address[]>(existing.cc_json, computed.cc) : computed.cc;
   const fromEmail = existing?.from_email ?? ([...target.to, ...target.cc].find((a) => mine.includes(a.email))?.email ?? acc.email);
 
-  const { system, user } = buildDraftPrompt({
+  const prompt = buildDraftPrompt({
     ownerDescription: DEFAULT_OWNER, styleGuide: await getStyleGuide(), profile: person ? toPromptProfile(person) : null,
     pinnedDocs: pinned, thread: promptThread, availability, shareScheduleDetails: shareDetails, instruction: opts.instruction ?? null,
     examples, replyLanguageHint: person?.language ?? null, today: todayString(settings.timezone),
     recipients: { to: to.map((a) => a.email), cc: cc.map((a) => a.email) },
   });
+  return { thread, acc, target, existing, shareDetails, promptThread, person, availability, eventSummaries, replyMode, to, cc, fromEmail, prompt };
+}
+export type DraftContext = Awaited<ReturnType<typeof buildDraftContext>>;
+
+/** One model call + validation + post-checks. No writes except nothing; caller records usage. */
+export async function generateDraft(ctx: DraftContext, modelKey: string) {
+  const models = await getModels();
+  if (!models.models[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
+  const res = await getLlm().complete({ modelKey, purpose: "draft", system: ctx.prompt.system, user: ctx.prompt.user, schema: DraftOutput, schemaName: "draft", maxTokens: models.max_output_tokens.draft });
+  const injectionSuspected = INJECTION_RE.test(`${ctx.target.subject}\n${ctx.target.text}`);
+  const { output, notes } = postCheck(res.data, { eventSummaries: ctx.eventSummaries, shareScheduleDetails: ctx.shareDetails, injectionSuspected });
+  return { res, output, notes };
+}
+
+export async function draftThread(threadId: string, opts: DraftOptions) {
+  const db = await getDb();
+  const models = await getModels();
+  const modelKey = opts.modelKey ?? models.default_draft_model;
+  if (!models.models[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
+  const ctx = await buildDraftContext(threadId, opts);
+  const { thread, acc, target, existing, shareDetails, promptThread, person, replyMode, to, cc, fromEmail } = ctx;
 
   // ---- model call ----
-  const res = await getLlm().complete({ modelKey, purpose: "draft", system, user, schema: DraftOutput, schemaName: "draft", maxTokens: models.max_output_tokens.draft });
-  const injectionSuspected = INJECTION_RE.test(`${target.subject}\n${target.text}`);
-  const { output, notes } = postCheck(res.data, { eventSummaries, shareScheduleDetails: shareDetails, injectionSuspected });
-
+  const { res, output, notes } = await generateDraft(ctx, modelKey);
   // ---- store ----
   const ts = now();
   let draftId = existing?.id;

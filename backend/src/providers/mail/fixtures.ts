@@ -65,8 +65,8 @@ const d = (daysAgo: number, h = 10) => {
 /** Matthew's earlier sent replies (for profile seeding and voice examples). */
 export function sentFixtures(): FixtureSpec[] {
   return [
-    { id: "s1", threadId: "t-old-1", from: `Matthew Menard <${MOCK_OWNER}>`, to: "Claire Dubois <claire.dubois@choir.example.org>",
-      subject: "Re: Spring Brahms Requiem", date: d(40), labels: ["SENT"], inReplyTo: "<o1@choir.example.org>",
+    { id: "s1", threadId: "t-old-1", inReplyTo: "<o1@choir.example.org>", from: `Matthew Menard <${MOCK_OWNER}>`, to: "Claire Dubois <claire.dubois@choir.example.org>",
+      subject: "Re: Spring Brahms Requiem", date: d(40), labels: ["SENT"],
       body: "Hi Claire,\n\nYes, I can cover the bass solos for the Requiem. Send me the rehearsal plan when it is ready and I will block the dates.\n\nThank you for thinking of me." },
     { id: "s2", threadId: "t-old-2", from: `Matthew Menard <${MOCK_OWNER}>`, to: "Daniel Okafor <daniel@scores.example.com>",
       subject: "Re: Engraving proofs – Nocturne for SATB", date: d(30), labels: ["SENT"],
@@ -76,6 +76,20 @@ export function sentFixtures(): FixtureSpec[] {
       body: "Bonjour Sophie,\n\nMerci pour votre message. Émile progresse très bien. Je peux continuer les leçons le jeudi à 16 h jusqu'à la fin du trimestre.\n\nAu plaisir de vous revoir." },
     { id: "s4", threadId: "t-old-4", from: `Matthew Menard <${MOCK_OWNER}>`, to: "Raj Patel <raj@example.net>",
       subject: "Re: drinks?", date: d(12), labels: ["SENT"], body: "Raj — yes! Thursday works. I'll be done by 9." },
+  ];
+}
+
+/** The emails Matthew's sent fixtures were replying to (gives the eval harness real pairs). */
+export function originalFixtures(): FixtureSpec[] {
+  return [
+    { id: "o1", threadId: "t-old-1", from: "Claire Dubois <claire.dubois@choir.example.org>", subject: "Spring Brahms Requiem", date: d(41), messageId: "<o1@choir.example.org>", labels: ["INBOX"],
+      body: "Hi Matthew,\n\nOur soloist for the Brahms Requiem in April has withdrawn. Could you cover the baritone solos? Rehearsals would start in March.\n\nClaire" },
+    { id: "o2", threadId: "t-old-2", from: "Daniel Okafor <daniel@scores.example.com>", subject: "Engraving proofs – Nocturne for SATB", date: d(31), messageId: "<o2@scores.example.com>", labels: ["INBOX"],
+      body: "Matthew,\n\nThe engraving proofs for the Nocturne are attached. Please flag any corrections by Friday.\n\nDaniel" },
+    { id: "o3", threadId: "t-old-3", from: "Sophie Tremblay <sophie.tremblay@example.ca>", subject: "Leçons pour Émile", date: d(21), messageId: "<o3@example.ca>", labels: ["INBOX"],
+      body: "Bonjour Matthew,\n\nComment se passent les leçons d'Émile ? Pouvez-vous continuer le jeudi jusqu'à la fin du trimestre ?\n\nMerci,\nSophie" },
+    { id: "o4", threadId: "t-old-4", from: "Raj Patel <raj@example.net>", subject: "drinks?", date: d(13), messageId: "<o4@example.net>", labels: ["INBOX"],
+      body: "Drinks Thursday after your rehearsal?" },
   ];
 }
 

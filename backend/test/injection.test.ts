@@ -11,7 +11,7 @@ import { setup } from "./helpers.js";
 import { pollOnce } from "../src/worker/index.js";
 import { getDb, pj } from "../src/db/index.js";
 import { buildDraftPrompt } from "../src/drafting/prompt.js";
-import { HOSTILE } from "./fixtures/hostile.js";
+import { HOSTILE } from "../src/eval/hostile.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 

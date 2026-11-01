@@ -3,7 +3,7 @@
  * calls we use (history, messages, labels, drafts, send). Used in MOCK_MODE,
  * tests, and the evaluation harness demo.
  */
-import { makeGmailMessage, inboxFixtures, sentFixtures, MOCK_OWNER, type FixtureSpec } from "./fixtures.js";
+import { makeGmailMessage, inboxFixtures, sentFixtures, originalFixtures, MOCK_OWNER, type FixtureSpec } from "./fixtures.js";
 import { HistoryExpiredError, type MailProvider, type SendAs } from "./types.js";
 import type { GmailMessage } from "../../mail/types.js";
 
@@ -24,7 +24,7 @@ export class MockMailProvider implements MailProvider {
 
   constructor(seed = true) {
     if (seed) {
-      for (const f of [...sentFixtures(), ...inboxFixtures()]) this.add(f, false);
+      for (const f of [...originalFixtures(), ...sentFixtures(), ...inboxFixtures()]) this.add(f, false);
     }
   }
 

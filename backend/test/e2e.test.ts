@@ -19,7 +19,7 @@ async function threadBySubject(s: string) {
 describe("worker: sync, triage, auto-draft", () => {
   it("drafts only reply-worthy mail, skips bulk/no-reply, never sends", async () => {
     const r = await pollOnce();
-    expect(r.newMessages).toBe(14);
+    expect(r.newMessages).toBe(18);
     expect((await threadBySubject("This week in choral")).state).toBe("skipped");
     expect((await threadBySubject("Reminder: dentist")).state).toBe("skipped");
     expect((await threadBySubject("Messiah")).draft_status).toBe("drafted:haiku");
@@ -182,7 +182,7 @@ describe("draft → redraft → edit → save → send flow", () => {
     await pollOnce();
     const { call } = await authedServer();
     const ex = (await call("GET", "/api/export")).json();
-    expect(ex.data.messages.length).toBe(14);
+    expect(ex.data.messages.length).toBe(18);
     expect(JSON.stringify(ex.data.accounts)).not.toContain("tokens_enc");
     expect((await call("POST", "/api/wipe", { confirm: "yes", password: "a long test password" })).statusCode).toBe(400);
     expect((await call("POST", "/api/wipe", { confirm: "DELETE EVERYTHING", password: "nope" })).statusCode).toBe(401);
