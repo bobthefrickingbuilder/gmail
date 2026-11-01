@@ -20,7 +20,7 @@ requirement.
 | 4 | Default DB / hosting | **SQLite on the home server via Docker Compose** | Least infrastructure: one container, one file, easy backup. Vercel + Neon is documented in INSTALL.md as the alternative but is not the primary target (Vercel functions cannot hold a 2-minute polling loop; it needs Vercel Cron, see INSTALL). |
 | 5 | Worker | **In-process timer** in the same Node process | No queue service to run. Jobs are idempotent and tracked in the DB, so restarts are safe. |
 | 6 | Gmail push (Pub/Sub) | **Not enabled in v1**; polling only | Polling is the required baseline; Pub/Sub needs a public webhook and a GCP topic. Hook point: `POST /api/webhooks/gmail` (stubbed, documented). |
-| 7 | Web framework | **React 18 + Vite** | Most widely documented; `vite-plugin-pwa` makes the PWA/service worker. |
+| 7 | Web framework | **React 19 + Vite** | Most widely documented; `vite-plugin-pwa` makes the PWA/service worker. |
 | 8 | Routing in the web app | Small built-in router (hash routes) | Works identically inside Capacitor (`file://`-like origin) and Safari PWA. |
 | 9 | Realtime | **Server-sent events** (`/api/events`) | One-way server→app is all we need; simpler than WebSocket. Pull-to-refresh as fallback. |
 | 10 | App auth tokens | **Bearer tokens** (15-min access, 30-day rotating refresh) in memory + IndexedDB | Works the same in Capacitor and Safari (cookies across origins are unreliable in Capacitor). Because no cookies are used for auth, classic CSRF does not apply; we still require `Origin` to match the allow-list on state-changing requests. |
