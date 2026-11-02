@@ -45,6 +45,25 @@ describe("learning from edits", () => {
   });
 });
 
+describe("catch-up after an interrupted batch", () => {
+  it("triages stored-but-untriaged recent mail on the next poll, skipping open triage failures", async () => {
+    await pollOnce();
+    const db = await getDb();
+    const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+    const recent = await db.selectFrom("messages").select("id").where("is_from_me", "=", 0).where("date", ">=", since).execute();
+    expect(recent.length).toBeGreaterThan(1);
+    // Simulate a server stop part-way through: triage rows missing, and one message whose triage failed
+    await db.deleteFrom("triage").where("message_id", "in", recent.map((m) => m.id)).execute();
+    const failed = recent[0].id;
+    await db.insertInto("dead_letters").values({ id: "dl-1", kind: "triage", ref_id: failed, error: "x", attempts: 1,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), resolved_at: null }).execute();
+    await pollOnce();
+    const triaged = new Set((await db.selectFrom("triage").select("message_id").execute()).map((t) => t.message_id));
+    for (const m of recent.slice(1)) expect(triaged.has(m.id)).toBe(true);
+    expect(triaged.has(failed)).toBe(false);
+  });
+});
+
 describe("retention", () => {
   it("purges old bodies, keeps metadata and your own words", async () => {
     await pollOnce();

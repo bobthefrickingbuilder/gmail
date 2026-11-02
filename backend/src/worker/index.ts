@@ -74,6 +74,7 @@ export async function pollOnce(): Promise<{ accounts: number; newMessages: numbe
         }
       }
     }
+    drafted += await catchUpUntriaged();
     await wakeSnoozed();
     if (!hadError) { workerState.lastSuccessAt = now(); workerState.lastError = null; workerState.alerts.stalled = false; }
     emit("sync", { newMessages, drafted });
@@ -81,6 +82,35 @@ export async function pollOnce(): Promise<{ accounts: number; newMessages: numbe
   } finally {
     workerState.running = false;
   }
+}
+
+/**
+ * Catch-up: incoming mail that was stored but never triaged, e.g. because the
+ * server stopped part-way through a batch (sync only hands back NEW messages,
+ * so these would otherwise be stuck forever). Last 14 days only, oldest first,
+ * a bounded batch per poll. A message whose triage failed has an open
+ * dead letter and is left for the Needs-attention list instead of retried here.
+ */
+export const CATCH_UP_BATCH = 25;
+export async function catchUpUntriaged(): Promise<number> {
+  const db = await getDb();
+  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+  const stuck = await db.selectFrom("messages as m")
+    .innerJoin("accounts as a", "a.id", "m.account_id")
+    .select(["m.id", "m.thread_id"])
+    .where("a.enabled", "=", 1).where("a.status", "!=", "reauth_required")
+    .where("m.is_from_me", "=", 0).where("m.date", ">=", since)
+    .where((eb) => eb.not(eb.exists(eb.selectFrom("triage as t").select("t.id").whereRef("t.message_id", "=", "m.id"))))
+    .where((eb) => eb.not(eb.exists(eb.selectFrom("dead_letters as d").select("d.id")
+      .where("d.kind", "=", "triage").whereRef("d.ref_id", "=", "m.id").where("d.resolved_at", "is", null))))
+    .orderBy("m.date", "asc").limit(CATCH_UP_BATCH).execute();
+  let drafted = 0;
+  for (const m of stuck) {
+    if ((await processNewMessage(m.id, m.thread_id)) === "drafted") drafted++;
+    workerState.processed++;
+  }
+  if (stuck.length) log.info({ count: stuck.length }, "caught up on untriaged mail");
+  return drafted;
 }
 
 async function wakeSnoozed() {
