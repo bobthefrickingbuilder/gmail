@@ -3,7 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "description": "Personal AI email assistant: drafts replies, never sends on its own.",
-  "workspaces": ["backend", "web"],
+  "workspaces": [
+    "backend",
+    "web"
+  ],
   "scripts": {
     "dev": "npm run dev -w backend",
     "dev:web": "npm run dev -w web",
@@ -14,5 +17,10 @@
     "eval": "npm run eval -w backend",
     "setup": "node scripts/setup.mjs"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
+  }
 }
