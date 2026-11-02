@@ -16,7 +16,8 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const envPath = `${root}.env`;
 const example = fs.readFileSync(`${root}.env.example`, "utf8");
 const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
-const current = Object.fromEntries(existing.split("\n").filter((l) => /^\w+=/.test(l)).map((l) => [l.split("=")[0], l.slice(l.indexOf("=") + 1)]));
+// split on \r?\n: a .env or .env.example saved with CRLF (e.g. by Notepad) would otherwise never match, since "." skips "\r"
+const current = Object.fromEntries(existing.split(/\r?\n/).filter((l) => /^\w+=/.test(l)).map((l) => [l.split("=")[0], l.slice(l.indexOf("=") + 1)]));
 
 let vapid = { publicKey: "", privateKey: "" };
 try { vapid = (await import("web-push")).default.generateVAPIDKeys(); } catch { /* deps not installed yet */ }
@@ -28,7 +29,7 @@ const generated = {
   DOWNLOAD_PASSWORD: crypto.randomBytes(9).toString("base64url"),
   CRON_SECRET: crypto.randomBytes(24).toString("base64url"),
 };
-const out = example.split("\n").map((line) => {
+const out = example.split(/\r?\n/).map((line) => {
   const m = line.match(/^(\w+)=(.*)$/);
   if (!m) return line;
   const [, k, v] = m;
