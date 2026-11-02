@@ -9,8 +9,10 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+// fileURLToPath, not .pathname: handles Windows drive letters and spaces
+const root = fileURLToPath(new URL("..", import.meta.url));
 const envPath = `${root}.env`;
 const example = fs.readFileSync(`${root}.env.example`, "utf8");
 const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
