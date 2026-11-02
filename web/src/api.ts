@@ -36,7 +36,7 @@ export async function tryResume(): Promise<boolean> {
 
 async function refresh(): Promise<boolean> {
   if (refreshing) return refreshing;
-  refreshing = (async () => {
+  const work = async () => {
     const rt = await loadRefresh();
     if (!rt) return false;
     try {
@@ -44,8 +44,13 @@ async function refresh(): Promise<boolean> {
       if (!r.ok) { if (r.status === 401) await setSession(null); return false; }
       await setSession(await r.json());
       return true;
-    } catch { return false; } finally { refreshing = null; }
-  })();
+    } catch { return false; }
+  };
+  // One refresh at a time across tabs: two tabs sending the same refresh token
+  // looks like token theft to the server, which then revokes the session.
+  // Inside the lock each tab re-reads the token the previous tab just saved.
+  const locked = typeof navigator !== "undefined" && navigator.locks ? navigator.locks.request("auth-refresh", work) : work();
+  refreshing = locked.finally(() => { refreshing = null; });
   return refreshing;
 }
 
