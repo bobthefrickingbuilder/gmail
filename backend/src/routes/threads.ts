@@ -1,4 +1,4 @@
-/** INBOX / THREAD ROUTES — list, view, change state (done/snooze/skip), correct triage, search. */
+/** INBOX / THREAD ROUTES — list, view, change state (done/snooze/skip), read/unread, no reply needed, correct triage, search. */
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sql } from "kysely";
@@ -11,6 +11,7 @@ import { parseIcs } from "../mail/ics.js";
 import { mailFor } from "../providers/index.js";
 import { audit } from "../audit.js";
 import { emit } from "../notify/sse.js";
+import { discardDraft } from "../drafting/service.js";
 import { CATEGORIES } from "../providers/llm/schemas.js";
 import { signatureOptions } from "../drafting/signature.js";
 import { stripQuotedText } from "../mail/quotes.js";
@@ -23,6 +24,7 @@ export async function threadRoutes(app: FastifyInstance) {
       category: z.string().optional(), status: z.enum(["drafted", "needs-review", "urgent", "scheduling", "undrafted"]).optional(),
       person: z.string().optional(), model: z.string().optional(), label: z.string().optional(), q: z.string().optional(),
       limit: z.coerce.number().max(200).default(100), before: z.string().optional(),
+      sort: z.enum(["smart", "date"]).default("smart"),
     }), req.query);
     const db = await getDb();
     let query = db.selectFrom("threads")
@@ -32,7 +34,8 @@ export async function threadRoutes(app: FastifyInstance) {
       .select(["threads.id", "threads.subject", "threads.last_message_at", "threads.state", "threads.snooze_until", "threads.category",
         "threads.priority", "threads.summary", "threads.urgent", "threads.scheduling", "threads.draft_status", "threads.needs_attention",
         "threads.person_id", "people.display_name as person_name", "people.vip as person_vip", "drafts.id as draft_id", "drafts.status as draft_state",
-        "draft_versions.confidence", "draft_versions.flags_json", "draft_versions.open_questions_json"]);
+        "draft_versions.confidence", "draft_versions.flags_json", "draft_versions.open_questions_json",
+        sql<number>`exists(select 1 from messages m where m.thread_id = threads.id and m.is_from_me = 0 and m.labels_json like '%"UNREAD"%')`.as("unread")]);
     if (q.view === "inbox") query = query.where("threads.state", "=", "open");
     else if (q.view === "attention") query = query.where("threads.needs_attention", "=", 1);
     else if (q.view !== "all") query = query.where("threads.state", "=", q.view === "snoozed" ? "snoozed" : q.view);
@@ -51,14 +54,15 @@ export async function threadRoutes(app: FastifyInstance) {
       query = query.where((eb) => eb.or([eb("threads.subject", "like", like), eb("threads.summary", "like", like), eb("people.display_name", "like", like),
         eb("threads.id", "in", db.selectFrom("messages").select("thread_id").where((e2) => e2.or([e2("from_email", "like", like), e2("stripped_text", "like", like)])))]));
     }
-    const rows = await query.orderBy("threads.urgent", "desc").orderBy("threads.last_message_at", "desc").limit(q.limit).execute();
+    if (q.sort === "smart") query = query.orderBy("threads.urgent", "desc");
+    const rows = await query.orderBy("threads.last_message_at", "desc").limit(q.limit).execute();
     const ids = rows.map((r) => r.id);
     const latest = ids.length ? await db.selectFrom("messages").select(["thread_id", "from_name", "from_email", "snippet", "date", "is_from_me"])
       .where("thread_id", "in", ids).orderBy("date", "desc").execute() : [];
     const latestBy = new Map<string, (typeof latest)[number]>();
     for (const m of latest) if (!latestBy.has(m.thread_id)) latestBy.set(m.thread_id, m);
     return rows.map((r) => ({
-      ...r, urgent: r.urgent === 1, scheduling: r.scheduling === 1, needs_attention: r.needs_attention === 1, person_vip: r.person_vip === 1,
+      ...r, urgent: r.urgent === 1, scheduling: r.scheduling === 1, needs_attention: r.needs_attention === 1, person_vip: r.person_vip === 1, unread: r.unread === 1,
       flags: pj<string[]>(r.flags_json, []), open_questions: pj<string[]>(r.open_questions_json, []).length, flags_json: undefined, open_questions_json: undefined,
       latest: latestBy.get(r.id) ?? null,
     }));
@@ -79,7 +83,8 @@ export async function threadRoutes(app: FastifyInstance) {
     let card = null;
     try { card = await schedulingCard(id); } catch { card = null; }
     return {
-      thread: { ...thread, urgent: thread.urgent === 1, scheduling: thread.scheduling === 1 },
+      thread: { ...thread, urgent: thread.urgent === 1, scheduling: thread.scheduling === 1,
+        unread: messages.some((m) => m.is_from_me === 0 && pj<string[]>(m.labels_json, []).includes("UNREAD")) },
       messages: messages.map((m) => {
         const headers = pj<Record<string, string>>(m.headers_json, {});
         return { id: m.id, from_name: m.from_name, from_email: m.from_email, to: pj(m.to_json, []), cc: pj(m.cc_json, []), subject: m.subject,
@@ -108,6 +113,36 @@ export async function threadRoutes(app: FastifyInstance) {
     await db.updateTable("threads").set({ state: b.state, snooze_until: b.state === "snoozed" ? b.snooze_until ?? new Date(Date.now() + 86400_000).toISOString() : null,
       needs_attention: b.state === "open" ? undefined : 0, updated_at: now() }).where("id", "=", id).execute();
     await audit("user", `thread.${b.state}`, "thread", id);
+    emit("thread", { threadId: id });
+    return { ok: true };
+  });
+
+  // Read / unread, kept in step with Gmail (changes made in Gmail arrive with the next sync)
+  app.post("/api/threads/:id/read", async (req) => {
+    const { id } = req.params as { id: string };
+    const b = parse(z.object({ read: z.boolean() }), req.body);
+    const db = await getDb();
+    const thread = await db.selectFrom("threads").select(["account_id", "provider_thread_id"]).where("id", "=", id).executeTakeFirst();
+    if (!thread) throw notFound();
+    const acc = await db.selectFrom("accounts").selectAll().where("id", "=", thread.account_id).executeTakeFirstOrThrow();
+    await mailFor(acc).modifyThreadLabels(thread.provider_thread_id, b.read ? [] : ["UNREAD"], b.read ? ["UNREAD"] : []);
+    for (const m of await db.selectFrom("messages").select(["id", "labels_json"]).where("thread_id", "=", id).execute()) {
+      const labels = pj<string[]>(m.labels_json, []).filter((l) => l !== "UNREAD");
+      await db.updateTable("messages").set({ labels_json: JSON.stringify(b.read ? labels : [...labels, "UNREAD"]) }).where("id", "=", m.id).execute();
+    }
+    emit("thread", { threadId: id });
+    return { ok: true };
+  });
+
+  // "No reply needed": discard any draft (also in Gmail Drafts) and move the thread to Done
+  app.post("/api/threads/:id/no-reply", async (req) => {
+    const { id } = req.params as { id: string };
+    const db = await getDb();
+    if (!(await db.selectFrom("threads").select("id").where("id", "=", id).executeTakeFirst())) throw notFound();
+    for (const d of await db.selectFrom("drafts").select("id").where("thread_id", "=", id).where("status", "in", ["active", "saved"]).execute())
+      await discardDraft(d.id);
+    await db.updateTable("threads").set({ state: "done", snooze_until: null, needs_attention: 0, updated_at: now() }).where("id", "=", id).execute();
+    await audit("user", "thread.no_reply", "thread", id);
     emit("thread", { threadId: id });
     return { ok: true };
   });

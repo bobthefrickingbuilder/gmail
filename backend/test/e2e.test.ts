@@ -191,3 +191,74 @@ describe("draft → redraft → edit → save → send flow", () => {
     expect(await db.selectFrom("messages").selectAll().execute()).toEqual([]);
   });
 });
+
+describe("inbox sort", () => {
+  it("sort=date is newest first only; the default (smart) puts urgent first", async () => {
+    await pollOnce();
+    const { call } = await authedServer();
+    const byDate = (await call("GET", "/api/threads?view=all&sort=date")).json() as { last_message_at: string; urgent: boolean }[];
+    expect(byDate.length).toBeGreaterThan(2);
+    expect(byDate.map((t) => t.last_message_at)).toEqual([...byDate.map((t) => t.last_message_at)].sort().reverse());
+    const smart = (await call("GET", "/api/threads?view=all")).json() as { urgent: boolean }[];
+    const firstNonUrgent = smart.findIndex((t) => !t.urgent);
+    expect(smart.slice(firstNonUrgent).some((t) => t.urgent)).toBe(false);
+    expect(smart.some((t) => t.urgent)).toBe(true);
+  });
+});
+
+describe("drafting defaults", () => {
+  it("by default auto-drafts only needs-reply and urgent mail", async () => {
+    await setup({ defaultSettings: true });
+    await pollOnce();
+    const db = await getDb();
+    const drafted = await db.selectFrom("threads").select(["category"]).where("draft_status", "like", "drafted:%").execute();
+    expect(drafted.length).toBeGreaterThan(0);
+    for (const t of drafted) expect(["needs-reply", "urgent"]).toContain(t.category);
+    expect((await threadBySubject("Messiah")).draft_status).toBe("none");
+  });
+});
+
+describe("no reply needed", () => {
+  it("discards the draft (also in Gmail) and moves the thread to Done", async () => {
+    await pollOnce();
+    const t = await threadBySubject("Messiah");
+    expect(t.draft_status).toBe("drafted:haiku");
+    const { call } = await authedServer();
+    expect(ctx.mail.drafts.size).toBeGreaterThan(0);
+    const before = ctx.mail.drafts.size;
+    expect((await call("POST", `/api/threads/${t.id}/no-reply`)).statusCode).toBe(200);
+    const after = await threadBySubject("Messiah");
+    expect(after.state).toBe("done");
+    expect(after.draft_status).toBe("none");
+    expect(ctx.mail.drafts.size).toBe(before - 1);
+  });
+});
+
+describe("read / unread", () => {
+  it("opening marks read in Gmail; reading in Gmail shows up after the next sync", async () => {
+    await pollOnce();
+    const { call } = await authedServer();
+    const rows = (await call("GET", "/api/threads?view=all&sort=date")).json() as { id: string; unread: boolean }[];
+    const unread = rows.filter((r) => r.unread);
+    expect(unread.length).toBeGreaterThan(1);
+    const [a, b] = unread;
+
+    // App → Gmail
+    expect((await call("POST", `/api/threads/${a.id}/read`, { read: true })).statusCode).toBe(200);
+    const ta = await (await getDb()).selectFrom("threads").select("provider_thread_id").where("id", "=", a.id).executeTakeFirstOrThrow();
+    const gmailMsgs = [...ctx.mail.messages.values()].filter((m) => m.threadId === ta.provider_thread_id);
+    for (const m of gmailMsgs) expect(m.labelIds).not.toContain("UNREAD");
+    expect(((await call("GET", `/api/threads/${a.id}`)).json() as { thread: { unread: boolean } }).thread.unread).toBe(false);
+
+    // Gmail → app
+    const tb = await (await getDb()).selectFrom("threads").select("provider_thread_id").where("id", "=", b.id).executeTakeFirstOrThrow();
+    await ctx.mail.modifyThreadLabels(tb.provider_thread_id, [], ["UNREAD"]);
+    await pollOnce();
+    const after = (await call("GET", "/api/threads?view=all&sort=date")).json() as { id: string; unread: boolean }[];
+    expect(after.find((r) => r.id === b.id)?.unread).toBe(false);
+
+    // Mark unread again
+    await call("POST", `/api/threads/${a.id}/read`, { read: false });
+    expect(((await call("GET", "/api/threads?view=all")).json() as { id: string; unread: boolean }[]).find((r) => r.id === a.id)?.unread).toBe(true);
+  });
+});

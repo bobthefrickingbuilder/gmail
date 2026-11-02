@@ -6,8 +6,13 @@ import { MockMailProvider } from "../src/providers/mail/mock.js";
 import { MockCalendarProvider } from "../src/providers/calendar/mock.js";
 import { MockLlmProvider } from "../src/providers/llm/mock.js";
 import { MOCK_OWNER } from "../src/providers/mail/fixtures.js";
+import { saveSettings } from "../src/settings.js";
 
-export async function setup(opts: { seed?: boolean } = {}) {
+/** The drafting tests use scheduling/personal fixtures, so drafting is on for those
+ * categories unless a test asks for the shipped default (needs-reply + urgent only). */
+export const ALL_DRAFT_CATEGORIES = ["needs-reply", "scheduling", "personal", "urgent"];
+
+export async function setup(opts: { seed?: boolean; defaultSettings?: boolean } = {}) {
   resetEnv({ NODE_ENV: "test", MOCK_MODE: "true", DATABASE_URL: "sqlite::memory:", SETUP_CODE: "999999" });
   const db = createDb("sqlite::memory:");
   await migrate(db);
@@ -19,6 +24,7 @@ export async function setup(opts: { seed?: boolean } = {}) {
   const accountId = uid();
   await db.insertInto("accounts").values({ id: accountId, email: MOCK_OWNER, provider: "mock", display_name: "Matthew Menard", enabled: 1,
     tokens_enc: null, history_id: null, send_as_json: "[]", status: "ok", last_sync_at: null, last_error: null, created_at: now() }).execute();
+  if (!opts.defaultSettings) await saveSettings({ draft_categories: ALL_DRAFT_CATEGORIES });
   return { db, mail, calendar, llm, accountId };
 }
 

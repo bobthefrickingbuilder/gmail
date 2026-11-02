@@ -3,7 +3,7 @@ export interface Address { name: string | null; email: string }
 export interface ThreadRow {
   id: string; subject: string; last_message_at: string; state: string; category: string | null; priority: number | null; summary: string | null;
   urgent: boolean; scheduling: boolean; draft_status: string; needs_attention: boolean; person_id: string | null; person_name: string | null; person_vip: boolean;
-  draft_id: string | null; draft_state: string | null; confidence: string | null; flags: string[]; open_questions: number;
+  draft_id: string | null; draft_state: string | null; confidence: string | null; flags: string[]; open_questions: number; unread: boolean;
   latest: { from_name: string | null; from_email: string; snippet: string | null; date: string; is_from_me: number } | null;
 }
 export interface Message {
@@ -21,7 +21,7 @@ export interface Version {
 export interface Slot { start: string; end: string; label: string }
 export interface ButtonState { primary: { action: string; model: string; label: string }; toggle: { model: string; label: string } | null; secondary: { action: string; model: string; label: string } | null }
 export interface ThreadDetail {
-  thread: { id: string; provider_thread_id: string; subject: string; state: string; category: string | null; priority: number | null; summary: string | null; urgent: boolean; scheduling: boolean; draft_status: string; person_id: string | null };
+  thread: { id: string; provider_thread_id: string; subject: string; state: string; category: string | null; priority: number | null; summary: string | null; urgent: boolean; scheduling: boolean; draft_status: string; person_id: string | null; unread: boolean };
   messages: Message[];
   triage: { category: string; corrected_category: string | null; priority: number; summary: string; reasoning: string; stage: string; urgent: boolean; flags: string[] } | null;
   draft: { id: string; status: string; reply_mode: "reply" | "reply_all"; to: Address[]; cc: Address[]; from_email: string; signature_key: string | null; current_version_id: string; provider_draft_id: string | null; share_schedule_details: boolean } | null;

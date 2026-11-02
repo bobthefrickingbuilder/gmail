@@ -101,10 +101,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .trow .actions .a-done { background: #2e6b3a; } .trow .actions .a-snooze { background: #8a6d1a; } .trow .actions .a-skip { background: #6b6b6b; } .trow .actions .a-esc { background: #2f5d50; }
 .trow .face { position: relative; background: var(--surface); padding: .7rem .8rem; display: grid; grid-template-columns: 1fr auto; gap: .1rem .5rem; cursor: pointer; transition: transform .15s; touch-action: pan-y; }
 .trow .face[aria-current="true"] { background: var(--accent-soft); }
-.trow .from { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow .from { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trow .subj { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trow .sum { grid-column: 1 / -1; color: var(--muted); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .trow .badges { grid-column: 1 / -1; display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .2rem; }
+/* Unread: bold sender + subject, accent dot and edge (read rows stay regular weight) */
+.trow .face.unread { box-shadow: inset 3px 0 0 var(--accent); }
+.trow .face.unread .from, .trow .face.unread .subj { font-weight: 700; }
+.trow .face.unread .from::before { content: ""; display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; background: var(--accent); margin-right: .4rem; vertical-align: middle; }
 .ptr { text-align: center; color: var(--muted); font-size: .85rem; height: 0; overflow: hidden; transition: height .15s; }
 
 /* ---------- thread ---------- */

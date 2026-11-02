@@ -34,11 +34,15 @@ export class GoogleMailProvider implements MailProvider {
 
   async listHistory(startHistoryId: string) {
     const ids = new Set<string>();
+    const labels = new Map<string, string[]>(); // message id → labels after its latest change
     let pageToken: string | undefined; let historyId = startHistoryId;
     try {
       do {
-        const r = await this.call((g) => g.users.history.list({ userId: "me", startHistoryId, historyTypes: ["messageAdded"], pageToken, maxResults: 500 }));
-        for (const h of r.data.history ?? []) for (const a of h.messagesAdded ?? []) if (a.message?.id) ids.add(a.message.id);
+        const r = await this.call((g) => g.users.history.list({ userId: "me", startHistoryId, historyTypes: ["messageAdded", "labelAdded", "labelRemoved"], pageToken, maxResults: 500 }));
+        for (const h of r.data.history ?? []) {
+          for (const a of h.messagesAdded ?? []) if (a.message?.id) ids.add(a.message.id);
+          for (const c of [...(h.labelsAdded ?? []), ...(h.labelsRemoved ?? [])]) if (c.message?.id) labels.set(c.message.id, c.message.labelIds ?? []);
+        }
         historyId = String(r.data.historyId ?? historyId);
         pageToken = r.data.nextPageToken ?? undefined;
       } while (pageToken);
@@ -47,7 +51,7 @@ export class GoogleMailProvider implements MailProvider {
       if (status === 404) throw new HistoryExpiredError();
       throw e;
     }
-    return { messageIds: [...ids], historyId };
+    return { messageIds: [...ids], historyId, labelChanges: [...labels].map(([messageId, labelIds]) => ({ messageId, labelIds })) };
   }
 
   async listMessageIds(query: string, maxResults: number, pageToken?: string) {

@@ -3,7 +3,7 @@
  * the triage result with one-tap correction, the scheduling card, and the
  * draft panel. On wide landscape screens the draft sits in its own pane.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, apiUrl } from "../apiUrl";
 import { useApi, useLive, useFlash } from "../hooks";
 import { go } from "../router";
@@ -76,6 +76,13 @@ export function ThreadView({ id, split }: { id?: string; split?: boolean }) {
   const { data: d, error, reload } = useApi<ThreadDetail>(id ? `/api/threads/${id}` : null);
   useLive(["draft", "thread", "profile"], (e) => { if (!e.threadId || e.threadId === id) void reload(); });
   const [insert, setInsert] = useState<string | null>(null);
+  // Opening an unread email marks it read (in Gmail too). Once per opened thread, so "Mark unread" sticks.
+  const markedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!d || !d.thread.unread || markedFor.current === d.thread.id) return;
+    markedFor.current = d.thread.id;
+    void api(`/api/threads/${d.thread.id}/read`, { method: "POST", body: { read: true } }).catch(() => undefined);
+  }, [d]);
 
   if (!id) return <><div className="pane empty">Select an email.</div><div className="pane" /></>;
   if (error) return <div className="pane"><div className="banner error">{error}</div></div>;
@@ -85,11 +92,15 @@ export function ThreadView({ id, split }: { id?: string; split?: boolean }) {
     await api(`/api/threads/${d.thread.id}/state`, { method: "POST", body: { state, ...(state === "snoozed" ? { snooze_until: new Date(Date.now() + 86400_000).toISOString() } : {}) } });
     go("/inbox");
   };
+  const noReply = async () => { await api(`/api/threads/${d.thread.id}/no-reply`, { method: "POST" }); go("/inbox"); };
+  const markUnread = async () => { await api(`/api/threads/${d.thread.id}/read`, { method: "POST", body: { read: false } }); go("/inbox"); };
   const threadPane = (
     <div className="pane">
       <div className="toolbar">
         {!split && <button className="btn small" onClick={() => go("/inbox")} aria-label="Back to inbox">‹</button>}
         <h2>{d.thread.subject || "(no subject)"}</h2>
+        <button className="btn small" onClick={noReply} title="Discard any draft and move to Done">No reply needed</button>
+        <button className="btn small" onClick={markUnread}>Mark unread</button>
         <button className="btn small" onClick={() => setState("done")}>Done</button>
         <button className="btn small" onClick={() => setState("snoozed")}>Snooze</button>
       </div>

@@ -1,6 +1,7 @@
 /**
  * INBOX / QUEUE
- * Emails grouped by triage category, highest priority first. Badges show
+ * Newest first by default. The "Smart sort" toggle (remembered per device)
+ * groups emails by triage category, urgent and highest priority first. Badges show
  * drafted / needs review / urgent / scheduling. Filters by category, status,
  * person, model and label; search; pull to refresh; swipe a row left for
  * Done / Snooze / Skip, right to escalate the draft model.
@@ -15,6 +16,9 @@ import type { ThreadRow } from "../types";
 const ORDER = ["urgent", "needs-reply", "scheduling", "personal", "invoice/admin", "fyi", "other", "newsletter", "uncategorized"];
 const STATUS = [["", "All"], ["drafted", "Drafted"], ["needs-review", "Needs review"], ["urgent", "Urgent"], ["scheduling", "Scheduling"], ["undrafted", "No draft"]] as const;
 const VIEWS = [["inbox", "Inbox"], ["snoozed", "Snoozed"], ["done", "Done"], ["skipped", "Skipped"]] as const;
+const SMART_KEY = "inboxSmartSort";
+const loadSmart = () => { try { return localStorage.getItem(SMART_KEY) === "1"; } catch { return false; } };
+const saveSmart = (on: boolean) => { try { localStorage.setItem(SMART_KEY, on ? "1" : "0"); } catch { /* storage unavailable */ } };
 
 function Row({ t, selected, onChanged }: { t: ThreadRow; selected: boolean; onChanged: () => void }) {
   const [dx, setDx] = useState(0);
@@ -38,8 +42,8 @@ function Row({ t, selected, onChanged }: { t: ThreadRow; selected: boolean; onCh
           <button className="a-snooze" onClick={() => act("snoozed")}>Snooze</button>
           <button className="a-skip" onClick={() => act("skipped")}>Skip</button></>}
       </div>
-      <div className="face" role="link" tabIndex={0} aria-current={selected ? "true" : undefined} style={{ transform: `translateX(${dx}px)` }}
-        aria-label={`${sender}: ${t.subject}${t.urgent ? ", urgent" : ""}${model ? `, drafted with ${model}` : ""}`}
+      <div className={`face${t.unread ? " unread" : ""}`} role="link" tabIndex={0} aria-current={selected ? "true" : undefined} style={{ transform: `translateX(${dx}px)` }}
+        aria-label={`${t.unread ? "Unread. " : ""}${sender}: ${t.subject}${t.urgent ? ", urgent" : ""}${model ? `, drafted with ${model}` : ""}`}
         onClick={() => { if (dx !== 0) { setDx(0); return; } go(`/thread/${t.id}`); }}
         onKeyDown={(e) => { if (e.key === "Enter") go(`/thread/${t.id}`); if (e.key === "d") void act("done"); }}
         onTouchStart={(e) => { start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
@@ -69,7 +73,9 @@ export function Inbox({ selected, query }: { selected?: string; query: URLSearch
   const [category, setCategory] = useState("");
   const [q, setQ] = useState("");
   const [model, setModel] = useState("");
-  const params = new URLSearchParams({ view, ...(status && { status }), ...(category && { category }), ...(q && { q }), ...(model && { model }) });
+  const [smart, setSmart] = useState(loadSmart);
+  const toggleSmart = () => setSmart((on) => { saveSmart(!on); return !on; });
+  const params = new URLSearchParams({ view, sort: smart ? "smart" : "date", ...(status && { status }), ...(category && { category }), ...(q && { q }), ...(model && { model }) });
   const { data, error, reload, loading } = useApi<ThreadRow[]>(`/api/threads?${params}`);
   useLive(["thread", "draft", "sync"], () => void reload());
   const attention = useApi<unknown[]>("/api/attention");
@@ -79,11 +85,12 @@ export function Inbox({ selected, query }: { selected?: string; query: URLSearch
   const scroller = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(() => {
+    if (!smart) return [["", [...(data ?? [])].sort((a, b) => b.last_message_at.localeCompare(a.last_message_at))]] as [string, ThreadRow[]][];
     const g = new Map<string, ThreadRow[]>();
     for (const t of data ?? []) { const k = t.category ?? "uncategorized"; g.set(k, [...(g.get(k) ?? []), t]); }
     for (const list of g.values()) list.sort((a, b) => Number(b.urgent) - Number(a.urgent) || (b.priority ?? 0) - (a.priority ?? 0) || b.last_message_at.localeCompare(a.last_message_at));
     return [...g.entries()].sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0]));
-  }, [data]);
+  }, [data, smart]);
 
   const refresh = async () => { await api("/api/sync/now", { method: "POST" }).catch(() => undefined); await reload(); };
 
@@ -93,6 +100,7 @@ export function Inbox({ selected, query }: { selected?: string; query: URLSearch
       onTouchEnd={() => { if (pull > 60) void refresh(); setPull(0); touchY.current = null; }}>
       <div className="toolbar">
         <h1>Inbox</h1>
+        <button className="chip" aria-pressed={smart} onClick={toggleSmart} title="Group by category, urgent and highest priority first">Smart sort</button>
         <button className="btn small" onClick={refresh} aria-label="Check for new mail">{loading ? "…" : "↻"}</button>
         <button className="btn small" onClick={() => go("/search")} aria-label="Search">⌕</button>
       </div>
@@ -111,9 +119,9 @@ export function Inbox({ selected, query }: { selected?: string; query: URLSearch
       </div>
       {error && <div className="banner error">{error}</div>}
       {data && data.length === 0 && <div className="empty">Nothing here.</div>}
-      {groups.map(([cat, list]) => (
-        <section key={cat} aria-label={cat}>
-          <h2 className="group-h">{cat} · {list.length}</h2>
+      {data && data.length > 0 && groups.map(([cat, list]) => (
+        <section key={cat || "all"} aria-label={cat || "All mail, newest first"}>
+          {cat && <h2 className="group-h">{cat} · {list.length}</h2>}
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>{list.map((t) => <Row key={t.id} t={t} selected={t.id === selected} onChanged={reload} />)}</ul>
         </section>
       ))}

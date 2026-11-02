@@ -15,8 +15,9 @@ export interface SendAs { email: string; displayName: string | null; signature: 
 export interface MailProvider {
   readonly kind: string;
   getProfile(): Promise<{ email: string; historyId: string }>;
-  /** Message IDs added since `startHistoryId`. Throws HistoryExpiredError if too old. */
-  listHistory(startHistoryId: string): Promise<{ messageIds: string[]; historyId: string }>;
+  /** Message IDs added since `startHistoryId`, plus the current labels of messages whose
+   *  labels changed (e.g. read/unread in Gmail). Throws HistoryExpiredError if too old. */
+  listHistory(startHistoryId: string): Promise<{ messageIds: string[]; historyId: string; labelChanges: { messageId: string; labelIds: string[] }[] }>;
   listMessageIds(query: string, maxResults: number, pageToken?: string): Promise<{ ids: string[]; nextPageToken?: string }>;
   getMessage(id: string): Promise<GmailMessage>;
   getAttachment(messageId: string, attachmentId: string): Promise<Buffer>;

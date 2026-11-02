@@ -14,6 +14,7 @@ import { storeMessage } from "./store.js";
 import { extractText, isExtractable, MAX_ATTACHMENT_BYTES } from "./attachments.js";
 import type { AccountsTable } from "../db/schema.js";
 import { log } from "../log.js";
+import { emit } from "../notify/sse.js";
 
 export const FULL_SYNC_QUERY = "newer_than:14d -in:chats";
 export const FULL_SYNC_MAX = 200;
@@ -54,6 +55,20 @@ export async function refreshSendAs(acc: AccountsTable, mail: MailProvider) {
   return sendAs;
 }
 
+/** Keep stored labels (read/unread, etc.) in step with changes made in Gmail. */
+async function applyLabelChanges(accountId: string, changes: { messageId: string; labelIds: string[] }[]) {
+  const db = await getDb();
+  const threads = new Set<string>();
+  for (const c of changes) {
+    const m = await db.selectFrom("messages").select(["id", "thread_id", "labels_json"])
+      .where("account_id", "=", accountId).where("provider_message_id", "=", c.messageId).executeTakeFirst();
+    if (!m || m.labels_json === j(c.labelIds)) continue;
+    await db.updateTable("messages").set({ labels_json: j(c.labelIds) }).where("id", "=", m.id).execute();
+    threads.add(m.thread_id);
+  }
+  for (const threadId of threads) emit("thread", { threadId });
+}
+
 /** Returns newly stored messages (oldest first) for triage. */
 export async function syncAccount(acc: AccountsTable): Promise<{ messageId: string; threadId: string }[]> {
   const mail = mailFor(acc);
@@ -65,7 +80,9 @@ export async function syncAccount(acc: AccountsTable): Promise<{ messageId: stri
   let ids: string[]; let historyId: string; let mode: "incremental" | "full" = "incremental";
   try {
     if (!acc.history_id) throw new HistoryExpiredError();
-    ({ messageIds: ids, historyId } = await mail.listHistory(acc.history_id));
+    let labelChanges: { messageId: string; labelIds: string[] }[];
+    ({ messageIds: ids, historyId, labelChanges } = await mail.listHistory(acc.history_id));
+    await applyLabelChanges(acc.id, labelChanges);
   } catch (e) {
     if (!(e instanceof HistoryExpiredError)) throw e;
     mode = "full";

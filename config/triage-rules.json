@@ -7,7 +7,7 @@
   "bulk_sender_domains": ["mailchimp.com", "mcsv.net", "sendgrid.net", "constantcontact.com", "substack.com", "eventbrite.com", "facebookmail.com", "linkedin.com"],
   "skip_labels": ["SPAM", "TRASH", "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL", "CATEGORY_FORUMS"],
   "categories": ["needs-reply", "fyi", "scheduling", "invoice/admin", "newsletter", "personal", "urgent", "other"],
-  "draft_categories": ["needs-reply", "scheduling", "personal", "urgent"],
+  "draft_categories": ["needs-reply", "urgent"],
   "urgent_keywords": ["urgent", "asap", "today", "tonight", "deadline", "by tomorrow", "immédiatement", "urgente", "aujourd'hui", "date limite"],
   "urgent_deadline_hours": 48
 }

@@ -12,7 +12,8 @@ export class MockMailProvider implements MailProvider {
   readonly kind = "mock";
   messages = new Map<string, GmailMessage>();
   attachments = new Map<string, Buffer>();
-  history: { id: number; messageId: string }[] = [];
+  /** labelIds set = a label change (current labels); unset = message added */
+  history: { id: number; messageId: string; labelIds?: string[] }[] = [];
   historyCounter = 1000;
   labels = new Map<string, string>([["INBOX", "INBOX"], ["SENT", "SENT"], ["UNREAD", "UNREAD"]]);
   threadLabels = new Map<string, Set<string>>();
@@ -44,8 +45,12 @@ export class MockMailProvider implements MailProvider {
   async listHistory(start: string) {
     const s = Number(start);
     if (s < this.minHistory) throw new HistoryExpiredError();
-    const ids = this.history.filter((h) => h.id > s).map((h) => h.messageId);
-    return { messageIds: [...new Set(ids)], historyId: String(this.historyCounter) };
+    const recent = this.history.filter((h) => h.id > s);
+    const ids = recent.filter((h) => !h.labelIds).map((h) => h.messageId);
+    const labels = new Map<string, string[]>();
+    for (const h of recent) if (h.labelIds) labels.set(h.messageId, h.labelIds);
+    return { messageIds: [...new Set(ids)], historyId: String(this.historyCounter),
+      labelChanges: [...labels].map(([messageId, labelIds]) => ({ messageId, labelIds })) };
   }
 
   async listMessageIds(query: string, maxResults: number, pageToken?: string) {
@@ -80,6 +85,14 @@ export class MockMailProvider implements MailProvider {
     const set = this.threadLabels.get(threadId) ?? new Set<string>();
     add.forEach((l) => set.add(l)); remove.forEach((l) => set.delete(l));
     this.threadLabels.set(threadId, set);
+    // Like Gmail's threads.modify: applies to every message, recorded in history
+    for (const m of this.messages.values()) {
+      if (m.threadId !== threadId) continue;
+      const labels = new Set(m.labelIds ?? []);
+      add.forEach((l) => labels.add(l)); remove.forEach((l) => labels.delete(l));
+      m.labelIds = [...labels];
+      this.history.push({ id: ++this.historyCounter, messageId: m.id, labelIds: m.labelIds });
+    }
   }
   async createDraft(threadId: string, raw: string) {
     const draftId = `d${++this.draftSeq}`;
