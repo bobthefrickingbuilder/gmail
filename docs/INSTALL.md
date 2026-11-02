@@ -95,6 +95,8 @@ npm ci && npm run build && node backend/dist/index.js
 
 Run it under systemd or pm2 so it restarts automatically.
 
+**On Windows:** a Task Scheduler task named `Email Assistant` runs `wscript.exe scripts\windows-start.vbs` at sign-in (no console window, restart on failure, output in `data\server.log`). Set `HOST=127.0.0.1` in `.env` and put Tailscale Serve in front (`tailscale serve --bg 8787`). Ending the task does not stop node, so use `scripts\windows-restart.cmd` instead: no argument restarts, `build` rebuilds first, `stop` stops it.
+
 ### Option B: Vercel + Neon Postgres (documented alternative)
 
 Serverless hosting has no always-on worker. Polling is done by Vercel Cron calling `/api/cron/poll`. On the Hobby plan crons run at most once a day; Pro is needed for every 5 minutes.
