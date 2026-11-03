@@ -56,6 +56,25 @@ email_index is the index attribute of the email the event came from. The emails 
 Return only JSON matching the schema; an empty list is fine.`;
 }
 
+/** Sets alreadyOnCalendar on each event: same start (±30 min, or same day for all-day) and a shared title word. */
+export async function markAlreadyOnCalendar<E extends { title: string; start: string; allDay: boolean; alreadyOnCalendar: boolean }>(events: E[]) {
+  if (!events.length) return;
+  const acc = await primaryAccount();
+  if (!acc) return;
+  const s = await getSettings();
+  const from = new Date(Math.min(...events.map((e) => new Date(e.start).getTime())) - 86_400_000).toISOString();
+  const to = new Date(Math.max(...events.map((e) => new Date(e.start).getTime())) + 2 * 86_400_000).toISOString();
+  const existing = await calendarFor(acc).listEvents(s.calendars, from, to).catch(() => []);
+  for (const e of events) {
+    const t = new Date(e.start).getTime(); const w = words(e.title);
+    e.alreadyOnCalendar = existing.some((x) => {
+      const sameTime = e.allDay ? x.start.slice(0, 10) === e.start.slice(0, 10) : Math.abs(new Date(x.start).getTime() - t) <= 30 * 60_000;
+      const xs = words(x.summary);
+      return sameTime && (xs.size === 0 || [...w].some((v) => xs.has(v)));
+    });
+  }
+}
+
 export async function scanEmailsForEvents(opts: { days?: number; max?: number } = {}): Promise<{ events: EventCandidate[]; scanned: number }> {
   const acc = await primaryAccount();
   if (!acc) throw new HttpError(409, "Connect Google first");
@@ -103,19 +122,7 @@ export async function scanEmailsForEvents(opts: { days?: number; max?: number } 
   const upcoming = found.filter((e) => new Date(e.start).getTime() >= todayStart.getTime())
     .filter((e) => { const k = `${new Date(e.start).toISOString()}|${e.title.toLowerCase()}`; return seen.has(k) ? false : (seen.add(k), true); })
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-  if (upcoming.length) {
-    const from = new Date(Math.min(...upcoming.map((e) => new Date(e.start).getTime())) - 86_400_000).toISOString();
-    const to = new Date(Math.max(...upcoming.map((e) => new Date(e.start).getTime())) + 2 * 86_400_000).toISOString();
-    const existing = await calendarFor(acc).listEvents(s.calendars, from, to).catch(() => []);
-    for (const e of upcoming) {
-      const t = new Date(e.start).getTime(); const w = words(e.title);
-      e.alreadyOnCalendar = existing.some((x) => {
-        const sameTime = e.allDay ? x.start.slice(0, 10) === e.start.slice(0, 10) : Math.abs(new Date(x.start).getTime() - t) <= 30 * 60_000;
-        const xs = words(x.summary);
-        return sameTime && (xs.size === 0 || [...w].some((v) => xs.has(v)));
-      });
-    }
-  }
+  await markAlreadyOnCalendar(upcoming);
   await audit("user", "calendar.scan", null, null, { scanned: msgs.length, found: upcoming.length });
   return { events: upcoming, scanned: msgs.length };
 }

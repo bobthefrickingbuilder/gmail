@@ -16,6 +16,7 @@ import { discardDraft } from "../drafting/service.js";
 import { CATEGORIES } from "../providers/llm/schemas.js";
 import { signatureOptions } from "../drafting/signature.js";
 import { stripQuotedText } from "../mail/quotes.js";
+import { analyzeThread, addSuggestion, dismissSuggestion } from "../analysis/service.js";
 import type { SendAs } from "../providers/mail/types.js";
 
 export const LOW_VALUE = ["newsletter", "fyi", "other"];
@@ -228,5 +229,21 @@ export async function threadRoutes(app: FastifyInstance) {
         .where("draft_versions.body", "like", like).orderBy("draft_versions.created_at", "desc").limit(20).execute(),
     ]);
     return { emails, people, drafts };
+  });
+
+  // To-do / calendar suggestions found in the email (analysis/service.ts). Nothing is added until you press a button.
+  app.get("/api/threads/:id/analysis", async (req) => {
+    const { id } = req.params as { id: string };
+    const q = parse(z.object({ force: z.string().optional() }), req.query);
+    return analyzeThread(id, { force: q.force === "1" });
+  });
+  app.post("/api/threads/:id/analysis/:key/add", async (req) => {
+    const { id, key } = req.params as { id: string; key: string };
+    const b = parse(z.object({ title: z.string().min(1).max(200).optional(), start: z.string().optional(), due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional() }), req.body ?? {});
+    return addSuggestion(id, key, b);
+  });
+  app.post("/api/threads/:id/analysis/:key/dismiss", async (req) => {
+    const { id, key } = req.params as { id: string; key: string };
+    return dismissSuggestion(id, key);
   });
 }

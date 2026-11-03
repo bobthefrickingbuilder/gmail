@@ -118,6 +118,25 @@ export class MockLlmProvider implements LlmProvider {
         }
         return { events: out };
       }
+      case "thread_analysis": {
+        // Mock: "please/can you … by <weekday>" → a to-do; a rehearsal/concert/meeting/lesson on a weekday → an event next week at 19:00 UTC
+        const text = req.user.replace(/<[^>]+>/g, " ");
+        const dayIdx = (w: string) => ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].indexOf(w.toLowerCase());
+        const nextWeek = (w: string) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + ((dayIdx(w) - d.getUTCDay() + 7) % 7) + 7); return d; };
+        const todos: unknown[] = []; const events: unknown[] = [];
+        const ask = text.match(/(?:please|can you|could you)\s+([^.?!\n]{4,80}?)(?:\s+by\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow))?[.?!\n]/i);
+        if (ask) {
+          const due = ask[2] ? (ask[2].toLowerCase() === "tomorrow" ? new Date(Date.now() + 86_400_000) : nextWeek(ask[2])).toISOString().slice(0, 10) : null;
+          todos.push({ title: ask[1].charAt(0).toUpperCase() + ask[1].slice(1), due_date: due, notes: null, evidence: ask[0].trim() });
+        }
+        const kind = /concert/i.test(text) ? "concert" : /rehearsal|répétition/i.test(text) ? "rehearsal" : /lesson|leçon/i.test(text) ? "lesson" : /meeting/i.test(text) ? "meeting" : null;
+        const day = text.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+        if (kind && day) {
+          const d = nextWeek(day[1]); d.setUTCHours(19, 0, 0, 0);
+          events.push({ title: kind.charAt(0).toUpperCase() + kind.slice(1), start: d.toISOString(), end: null, all_day: false, location: null, kind, evidence: day[0] });
+        }
+        return { todos, events };
+      }
       case "task_breakdown": {
         const title = req.user.match(/<task title="([^"]*)"/)?.[1] ?? "the task";
         return { steps: [

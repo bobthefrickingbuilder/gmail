@@ -215,3 +215,70 @@ describe("scan emails for events", () => {
     expect(ctx.calendar.created.at(-1)).toMatchObject({ allDay: true, start: "2026-12-01", end: "2026-12-02" });
   });
 });
+
+describe("email analysis (to-do / calendar suggestions)", () => {
+  const threadBySubject = async (subject: string) =>
+    (await (await getDb()).selectFrom("threads").select("id").where("subject", "=", subject).executeTakeFirstOrThrow()).id;
+
+  it("suggests only concrete items, adds nothing until you press a button, and is saved per message", async () => {
+    await pollOnce();
+    const { call } = await authedServer();
+    const contract = await threadBySubject("Contract for the new commission");
+    const r = (await call("GET", `/api/threads/${contract}/analysis`)).json();
+    const todo = r.items.find((i: { type: string }) => i.type === "todo");
+    expect(todo.title).toMatch(/review clause 4/i);
+    expect(todo.due_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(todo.added).toBeNull();
+    expect((await call("GET", "/api/tasks")).json().tasks).toHaveLength(0); // analysing adds nothing
+    const llmCall = ctx.llm.calls.find((c) => c.schemaName === "thread_analysis")!;
+    expect(llmCall.system).toContain("Most emails contain NOTHING concrete");
+
+    // opening it again uses the saved result
+    const calls = ctx.llm.calls.length;
+    await call("GET", `/api/threads/${contract}/analysis`);
+    expect(ctx.llm.calls.length).toBe(calls);
+
+    // pressing the button adds it, linked to the email, once
+    const added = (await call("POST", `/api/threads/${contract}/analysis/${todo.key}/add`, {})).json();
+    expect(added.added).toBeTruthy();
+    const tasks = (await call("GET", "/api/tasks")).json().tasks;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].thread_id).toBe(contract);
+    expect(tasks[0].due_date).toBe(todo.due_date);
+    expect((await call("POST", `/api/threads/${contract}/analysis/${todo.key}/add`, {})).statusCode).toBe(409);
+  });
+
+  it("finds nothing in chit-chat, skips newsletters without calling the AI, and can hide a suggestion", async () => {
+    await pollOnce();
+    const { call } = await authedServer();
+    const dinner = await threadBySubject("dinner saturday?");
+    expect((await call("GET", `/api/threads/${dinner}/analysis`)).json().items).toEqual([]);
+
+    const before = ctx.llm.calls.filter((c) => c.schemaName === "thread_analysis").length;
+    const news = await threadBySubject("This week in choral music");
+    expect((await call("GET", `/api/threads/${news}/analysis`)).json()).toEqual({ items: [], status: "skipped" });
+    expect(ctx.llm.calls.filter((c) => c.schemaName === "thread_analysis").length).toBe(before);
+
+    const contract = await threadBySubject("Contract for the new commission");
+    const { items } = (await call("GET", `/api/threads/${contract}/analysis`)).json();
+    await call("POST", `/api/threads/${contract}/analysis/${items[0].key}/dismiss`);
+    expect((await call("GET", `/api/threads/${contract}/analysis`)).json().items[0].dismissed).toBe(true);
+    expect(ctx.calendar.created).toHaveLength(0);
+  });
+
+  it("adds a suggested event as a tentative calendar event when you press it", async () => {
+    await pollOnce();
+    const { call } = await authedServer();
+    const db = await getDb();
+    const t = await threadBySubject("dinner saturday?");
+    // a concrete event in the latest email
+    await db.updateTable("messages").set({ stripped_text: "Rehearsal is on Thursday at 7 in the chapel." }).where("thread_id", "=", t).execute();
+    const r = (await call("GET", `/api/threads/${t}/analysis?force=1`)).json();
+    const ev = r.items.find((i: { type: string }) => i.type === "event");
+    expect(ev.title).toBe("Rehearsal");
+    expect(ctx.calendar.created).toHaveLength(0);
+    await call("POST", `/api/threads/${t}/analysis/${ev.key}/add`, {});
+    expect(ctx.calendar.created).toHaveLength(1);
+    expect(ctx.calendar.created[0].tentative).toBe(true);
+  });
+});

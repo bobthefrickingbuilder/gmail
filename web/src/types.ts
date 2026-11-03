@@ -45,3 +45,9 @@ export interface EventCandidate {
   key: string; title: string; start: string; end: string | null; allDay: boolean; location: string | null; kind: string; confidence: string;
   evidence: string; source: "invite" | "claude"; threadId: string; subject: string; from: string; alreadyOnCalendar: boolean;
 }
+
+/** A to-do or calendar suggestion found in an email (backend analysis/service.ts). */
+export type AnalysisItem =
+  | { key: string; type: "todo"; title: string; due_date: string | null; notes: string | null; evidence: string; added: string | null; dismissed?: boolean }
+  | { key: string; type: "event"; title: string; start: string; end: string | null; allDay: boolean; location: string | null; kind: string;
+      evidence: string; source: "invite" | "ai"; added: string | null; dismissed?: boolean; alreadyOnCalendar: boolean };

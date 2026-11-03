@@ -12,6 +12,7 @@ import { dateTime, who } from "../format";
 import type { Message, ThreadDetail } from "../types";
 import { DraftPanel } from "../components/DraftPanel";
 import { SchedulingCard } from "../components/SchedulingCard";
+import { Suggestions } from "../components/Suggestions";
 
 function MessageCard({ m }: { m: Message }) {
   const [full, setFull] = useState(false);
@@ -134,10 +135,10 @@ export function ThreadView({ id, split }: { id?: string; split?: boolean }) {
         {d.scheduling && <SchedulingCard card={d.scheduling} onInsert={setInsert} subject={d.thread.subject} />}
         {!split && d.versions.length > 0 && <p className="stack-only"><a href="#draft">Jump to draft ↓</a></p>}
         {d.messages.slice().reverse().map((m) => <MessageCard key={m.id} m={m} />)}
-        {!split && <div id="draft"><DraftPanel d={d} reload={reload} insertText={insert} onInserted={() => setInsert(null)} /></div>}
+        {!split && <div id="draft"><DraftPanel d={d} reload={reload} insertText={insert} onInserted={() => setInsert(null)} /><Suggestions threadId={d.thread.id} /></div>}
       </div>
     </div>
   );
   if (!split) return threadPane;
-  return <>{threadPane}<div className="pane"><div className="content"><DraftPanel d={d} reload={reload} insertText={insert} onInserted={() => setInsert(null)} /></div></div></>;
+  return <>{threadPane}<div className="pane"><div className="content"><DraftPanel d={d} reload={reload} insertText={insert} onInserted={() => setInsert(null)} /><Suggestions threadId={d.thread.id} /></div></div></>;
 }

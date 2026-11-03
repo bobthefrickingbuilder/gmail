@@ -355,6 +355,14 @@ export interface TasksTable {
   completed_at: string | null;
 }
 
+export interface ThreadAnalysisTable {
+  id: string; // = thread id
+  message_id: string; // the latest incoming message that was analysed; a newer one triggers a fresh analysis
+  items_json: string; // AnalysisItem[] (see analysis/service.ts), including which ones you added
+  model: string | null; // null when nothing was sent to the AI (e.g. a calendar invitation)
+  created_at: string;
+}
+
 export interface DB {
   accounts: AccountsTable;
   threads: ThreadsTable;
@@ -383,4 +391,5 @@ export interface DB {
   contacts: ContactsTable;
   projects: ProjectsTable;
   tasks: TasksTable;
+  thread_analysis: ThreadAnalysisTable;
 }

@@ -30,6 +30,8 @@
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.6.10",
     "@capacitor/push-notifications": "^7.0.7",
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/source-sans-3": "^5.3.1",
     "@simplewebauthn/browser": "^14.0.0",
     "diff": "^9.0.0",
     "idb-keyval": "^6.3.0",

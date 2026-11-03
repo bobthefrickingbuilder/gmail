@@ -33,6 +33,7 @@ are stored as text so the same schema works in SQLite and Postgres.
 | `contacts` | Addresses for To: autocomplete (Google contacts + your mail) | `email`, `name`, `source`, `times_contacted`, `last_contacted_at` |
 | `projects` | To-do projects | `name`, `color`, `notes`, `position`, `archived` |
 | `tasks` | To-do tasks; `parent_id` makes a task a step of another | `project_id`, `parent_id`, `title`, `status`, `priority`, `due_date`, `thread_id`, `completed_at` |
+| `thread_analysis` | To-do / calendar suggestions found in an email (one row per thread) | `message_id` (the message analysed), `items_json` (suggestions and which you added or hid), `model` |
 
 **Idempotency:** `messages` has a unique index on `(account_id, provider_message_id)`;
 drafting checks `drafts` for an active draft on the thread and *updates* it

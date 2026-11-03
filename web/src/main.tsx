@@ -1,6 +1,8 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import "@fontsource-variable/fraunces";
+import "@fontsource-variable/source-sans-3";
 import "./styles.css";
 import { registerSW } from "virtual:pwa-register";
 import { isNative } from "./config";

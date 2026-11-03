@@ -188,7 +188,16 @@ const m002: Migration = {
   },
 };
 
-export const migrations: Record<string, Migration> = { "001_initial": m001, "002_compose_contacts_tasks": m002 };
+/** 003: what the AI found in an email that could go on your to-do list or calendar (one row per thread). */
+const m003: Migration = {
+  async up(db: Kysely<any>) {
+    await chain(db.schema.createTable("thread_analysis"), id,
+      (t) => txt(t, "message_id"), (t) => txt(t, "items_json", true, "[]"), (t) => txt(t, "model", false), (t) => txt(t, "created_at")).execute();
+  },
+  async down(db: Kysely<any>) { await db.schema.dropTable("thread_analysis").ifExists().execute(); },
+};
+
+export const migrations: Record<string, Migration> = { "001_initial": m001, "002_compose_contacts_tasks": m002, "003_thread_analysis": m003 };
 
 export class StaticMigrationProvider implements MigrationProvider {
   async getMigrations() { return migrations; }
