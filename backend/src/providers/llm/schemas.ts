@@ -50,6 +50,11 @@ export const DraftOutput = z.object({
 });
 export type DraftOutput = z.infer<typeof DraftOutput>;
 
+export const BreakdownOutput = z.object({
+  steps: z.array(z.object({ title: z.string(), notes: z.string().nullable() })),
+});
+export type BreakdownOutput = z.infer<typeof BreakdownOutput>;
+
 export const ProfileOutput = z.object({
   display_name: z.string(),
   organization: z.string().nullable(),

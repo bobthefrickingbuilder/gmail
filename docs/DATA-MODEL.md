@@ -29,6 +29,10 @@ are stored as text so the same schema works in SQLite and Postgres.
 | `sessions` | App sessions | `refresh_hash`, `expires_at`, `device`, `last_used_at` |
 | `push_subscriptions` | Web Push / FCM endpoints | `kind`, `endpoint`, `keys_json` |
 | `send_confirmations` | One-time send tokens (2-minute life) | `draft_id`, `token_hash`, `version_id`, `expires_at`, `used_at` |
+| `compose_drafts` | New emails you start yourself (not replies) | `from_email`, `to_json`, `cc_json`, `bcc_json`, `subject`, `body`, `provider_draft_id`, `status` |
+| `contacts` | Addresses for To: autocomplete (Google contacts + your mail) | `email`, `name`, `source`, `times_contacted`, `last_contacted_at` |
+| `projects` | To-do projects | `name`, `color`, `notes`, `position`, `archived` |
+| `tasks` | To-do tasks; `parent_id` makes a task a step of another | `project_id`, `parent_id`, `title`, `status`, `priority`, `due_date`, `thread_id`, `completed_at` |
 
 **Idempotency:** `messages` has a unique index on `(account_id, provider_message_id)`;
 drafting checks `drafts` for an active draft on the thread and *updates* it

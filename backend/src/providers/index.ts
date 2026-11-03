@@ -13,12 +13,14 @@ import { MockLlmProvider } from "./llm/mock.js";
 import { GoogleMailProvider } from "./mail/google.js";
 import { GoogleCalendarProvider } from "./calendar/google.js";
 import { AnthropicProvider } from "./llm/anthropic.js";
+import { GoogleContactsProvider, MockContactsProvider, type ContactsProvider } from "./contacts.js";
 
 const mailCache = new Map<string, MailProvider>();
 const calCache = new Map<string, CalendarProvider>();
 let llm: LlmProvider | null = null;
 let mockMail: MockMailProvider | null = null;
 let mockCal: MockCalendarProvider | null = null;
+let mockContacts: MockContactsProvider | null = null;
 
 export function getMockMail() { return (mockMail ??= new MockMailProvider()); }
 export function getMockCalendar() { return (mockCal ??= new MockCalendarProvider()); }
@@ -34,6 +36,10 @@ export function calendarFor(account: { id: string; provider: string }): Calendar
   let p = calCache.get(account.id);
   if (!p) { p = new GoogleCalendarProvider(account.id); calCache.set(account.id, p); }
   return p;
+}
+export function contactsFor(account: { id: string; provider: string }): ContactsProvider {
+  if (account.provider === "mock") return (mockContacts ??= new MockContactsProvider());
+  return new GoogleContactsProvider(account.id);
 }
 export function getLlm(): LlmProvider {
   if (!llm) llm = env().MOCK_MODE ? new MockLlmProvider() : new AnthropicProvider();

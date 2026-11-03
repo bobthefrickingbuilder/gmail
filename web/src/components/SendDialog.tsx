@@ -9,9 +9,10 @@ import { flagLabel } from "../format";
 import type { Address } from "../types";
 
 const full = (a: Address) => (a.name ? `${a.name} <${a.email}>` : a.email);
-interface Prep { token: string; expiresInSeconds: number; from: string; to: Address[]; cc: Address[]; subject: string; preview: string; flags: string[]; hasPlaceholders: boolean }
+interface Prep { token: string; expiresInSeconds: number; from: string; to: Address[]; cc: Address[]; bcc?: Address[]; subject: string; preview: string; flags: string[]; hasPlaceholders: boolean }
 
-export function SendDialog({ draftId, onClose, onSent }: { draftId: string; onClose: () => void; onSent: () => void }) {
+/** base: the draft's API path; replies use /api/drafts/:id, new emails /api/compose/:id. */
+export function SendDialog({ draftId, base = `/api/drafts/${draftId}`, onClose, onSent }: { draftId: string; base?: string; onClose: () => void; onSent: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [prep, setPrep] = useState<Prep | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -19,13 +20,13 @@ export function SendDialog({ draftId, onClose, onSent }: { draftId: string; onCl
   const [left, setLeft] = useState(120);
   useEffect(() => {
     ref.current?.showModal();
-    api<Prep>(`/api/drafts/${draftId}/send/prepare`, { method: "POST" }).then((p) => { setPrep(p); setLeft(p.expiresInSeconds); }).catch((e) => setErr((e as Error).message));
-  }, [draftId]);
+    api<Prep>(`${base}/send/prepare`, { method: "POST" }).then((p) => { setPrep(p); setLeft(p.expiresInSeconds); }).catch((e) => setErr((e as Error).message));
+  }, [base]);
   useEffect(() => { const t = setInterval(() => setLeft((l) => Math.max(0, l - 1)), 1000); return () => clearInterval(t); }, []);
   const send = async () => {
     if (!prep) return;
     setBusy(true);
-    try { await api(`/api/drafts/${draftId}/send`, { method: "POST", body: { token: prep.token, confirm: true } }); onSent(); }
+    try { await api(`${base}/send`, { method: "POST", body: { token: prep.token, confirm: true } }); onSent(); }
     catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   };
   return (
@@ -38,6 +39,7 @@ export function SendDialog({ draftId, onClose, onSent }: { draftId: string; onCl
             <tr><th scope="row">From</th><td>{prep.from}</td></tr>
             <tr><th scope="row">To</th><td>{prep.to.map(full).join(", ")}</td></tr>
             {prep.cc.length > 0 && <tr><th scope="row">Cc</th><td>{prep.cc.map(full).join(", ")}</td></tr>}
+            {(prep.bcc?.length ?? 0) > 0 && <tr><th scope="row">Bcc</th><td>{prep.bcc!.map(full).join(", ")}</td></tr>}
             <tr><th scope="row">Subject</th><td>{prep.subject}</td></tr>
           </tbody></table>
           <pre className="mail card small" style={{ marginTop: ".6rem" }}>{prep.preview}{"\n…"}</pre>

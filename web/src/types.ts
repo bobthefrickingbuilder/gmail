@@ -32,3 +32,16 @@ export interface ThreadDetail {
   signatures: { key: string; label: string }[];
   categories: string[];
 }
+export interface ComposeDraft {
+  id: string; from_email: string; to: Address[]; cc: Address[]; bcc: Address[]; subject: string; body: string; status: string; saved: boolean;
+  provider_draft_id: string | null; created_at: string; updated_at: string;
+}
+export interface Project { id: string; name: string; color: string; notes: string; position: number; archived: boolean; created_at: string }
+export interface Task {
+  id: string; project_id: string | null; parent_id: string | null; title: string; notes: string; status: "open" | "done"; priority: number;
+  due_date: string | null; position: number; thread_id: string | null; created_at: string; updated_at: string; completed_at: string | null;
+}
+export interface EventCandidate {
+  key: string; title: string; start: string; end: string | null; allDay: boolean; location: string | null; kind: string; confidence: string;
+  evidence: string; source: "invite" | "claude"; threadId: string; subject: string; from: string; alreadyOnCalendar: boolean;
+}

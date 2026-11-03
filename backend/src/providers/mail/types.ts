@@ -25,8 +25,9 @@ export interface MailProvider {
   /** Create missing labels; returns name → id. */
   ensureLabels(names: string[]): Promise<Record<string, string>>;
   modifyThreadLabels(threadId: string, add: string[], remove: string[]): Promise<void>;
-  createDraft(threadId: string, rawMime: string): Promise<{ draftId: string; messageId: string }>;
-  updateDraft(draftId: string, threadId: string, rawMime: string): Promise<{ draftId: string; messageId: string }>;
+  /** threadId null = a new email (not a reply). */
+  createDraft(threadId: string | null, rawMime: string): Promise<{ draftId: string; messageId: string }>;
+  updateDraft(draftId: string, threadId: string | null, rawMime: string): Promise<{ draftId: string; messageId: string }>;
   draftExists(draftId: string): Promise<boolean>;
   deleteDraft(draftId: string): Promise<void>;
   sendDraft(draftId: string): Promise<{ messageId: string; threadId: string }>;

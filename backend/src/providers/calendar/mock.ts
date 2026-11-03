@@ -31,7 +31,7 @@ export class MockCalendarProvider implements CalendarProvider {
   async createEvent(calendarId: string, ev: NewEvent) {
     const id = `new${this.created.length + 1}`;
     this.created.push({ ...ev, calendarId, id });
-    this.events.push({ id, calendarId, summary: ev.summary, start: ev.start, end: ev.end, allDay: false, location: ev.location ?? null,
+    this.events.push({ id, calendarId, summary: ev.summary, start: ev.start, end: ev.end, allDay: Boolean(ev.allDay), location: ev.location ?? null,
       status: ev.tentative ? "tentative" : "confirmed", transparency: null });
     return { id, htmlLink: null };
   }

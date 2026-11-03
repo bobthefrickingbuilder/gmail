@@ -5,7 +5,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { api, apiUrl } from "../apiUrl";
-import { useApi, useLive, useFlash } from "../hooks";
+import { useApi, useLive, useFlash, toast } from "../hooks";
+import { Avatar } from "../components/Avatar";
 import { go } from "../router";
 import { dateTime, who } from "../format";
 import type { Message, ThreadDetail } from "../types";
@@ -18,6 +19,7 @@ function MessageCard({ m }: { m: Message }) {
   return (
     <article className={`card msg ${m.is_from_me ? "me" : ""}`} aria-label={`From ${m.is_from_me ? "you" : who({ name: m.from_name, email: m.from_email })}`}>
       <div className="head">
+        <Avatar name={m.is_from_me ? "Me" : m.from_name} email={m.is_from_me ? "me" : m.from_email} size="sm" />
         <strong>{m.is_from_me ? "You" : who({ name: m.from_name, email: m.from_email })}</strong>
         <span className="muted small">{m.from_email}</span><span className="spacer" />
         <time className="muted small" dateTime={m.date}>{dateTime(m.date)}</time>
@@ -94,15 +96,37 @@ export function ThreadView({ id, split }: { id?: string; split?: boolean }) {
   };
   const noReply = async () => { await api(`/api/threads/${d.thread.id}/no-reply`, { method: "POST" }); go("/inbox"); };
   const markUnread = async () => { await api(`/api/threads/${d.thread.id}/read`, { method: "POST", body: { read: false } }); go("/inbox"); };
+  const addTodo = async () => {
+    await api("/api/tasks", { method: "POST", body: { title: d.thread.subject || "Follow up on email", thread_id: d.thread.id, notes: d.thread.summary ?? "" } });
+    toast("Added to your to-do list");
+  };
+  const sender = [...d.messages].reverse().find((m) => !m.is_from_me);
+  const junk = async (scope: "sender" | "domain", spam = false) => {
+    const what = scope === "domain" ? `everyone at @${sender?.from_email.split("@")[1]}` : sender?.from_email;
+    if (!confirm(`${spam ? "Report as spam and skip" : "Skip"} all future mail from ${what}? Their open emails move to Skipped. (Undo any time in Settings → Sender rules.)`)) return;
+    try { const r = await api<{ moved: number }>(`/api/threads/${d.thread.id}/junk`, { method: "POST", body: { scope, spam } }); toast(`Blocked — ${r.moved} email${r.moved === 1 ? "" : "s"} moved to Skipped`); go("/inbox"); }
+    catch (e) { toast((e as Error).message, "error"); }
+  };
   const threadPane = (
-    <div className="pane">
-      <div className="toolbar">
+    <div className="pane pane-anim" key={d.thread.id}>
+      <div className="toolbar wrap">
         {!split && <button className="btn small" onClick={() => go("/inbox")} aria-label="Back to inbox">‹</button>}
         <h2>{d.thread.subject || "(no subject)"}</h2>
+        <div className="acts">
         <button className="btn small" onClick={noReply} title="Discard any draft and move to Done">No reply needed</button>
+        <button className="btn small" onClick={addTodo} title="Add this email to your to-do list">☑︎ To-do</button>
         <button className="btn small" onClick={markUnread}>Mark unread</button>
         <button className="btn small" onClick={() => setState("done")}>Done</button>
         <button className="btn small" onClick={() => setState("snoozed")}>Snooze</button>
+        {sender && <details className="menu">
+          <summary className="btn small" title="Junk and spam">🚫</summary>
+          <div className="menu-pop">
+            <button onClick={() => junk("sender")}>Always skip mail from {sender.from_name || sender.from_email}</button>
+            <button onClick={() => junk("domain")}>Always skip mail from @{sender.from_email.split("@")[1]}</button>
+            <button onClick={() => junk("sender", true)} style={{ color: "var(--danger)" }}>Report spam & skip sender</button>
+          </div>
+        </details>}
+        </div>
       </div>
       <div className="content">
         {d.person && <p className="small"><a href={`#/person/${d.person.id}`}>{d.person.vip ? "★ " : ""}{d.person.display_name}</a>{d.person.organization ? ` · ${d.person.organization}` : ""}{d.person.relationship ? ` · ${d.person.relationship}` : ""}</p>}

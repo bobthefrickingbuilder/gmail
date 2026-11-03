@@ -1,9 +1,10 @@
-/** INBOX / THREAD ROUTES — list, view, change state (done/snooze/skip), read/unread, no reply needed, correct triage, search. */
+/** INBOX / THREAD ROUTES — list (Focused hides low-value mail), view, change state (done/snooze/skip), read/unread, no reply needed,
+ *  junk sender (always skip a sender or domain, optionally report spam to Gmail), correct triage, search. */
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sql } from "kysely";
 import { getDb, now, pj } from "../db/index.js";
-import { parse, notFound } from "../http.js";
+import { parse, notFound, HttpError } from "../http.js";
 import { correctCategory, triageMessage } from "../triage/service.js";
 import { buttonState } from "../drafting/models.js";
 import { schedulingCard } from "../calendar/service.js";
@@ -17,6 +18,9 @@ import { signatureOptions } from "../drafting/signature.js";
 import { stripQuotedText } from "../mail/quotes.js";
 import type { SendAs } from "../providers/mail/types.js";
 
+export const LOW_VALUE = ["newsletter", "fyi", "other"];
+const PERSONAL_PROVIDERS = /^@(gmail|googlemail|outlook|hotmail|live|yahoo|icloud|me|proton|protonmail)\.[a-z.]+$/;
+
 export async function threadRoutes(app: FastifyInstance) {
   app.get("/api/threads", async (req) => {
     const q = parse(z.object({
@@ -25,6 +29,7 @@ export async function threadRoutes(app: FastifyInstance) {
       person: z.string().optional(), model: z.string().optional(), label: z.string().optional(), q: z.string().optional(),
       limit: z.coerce.number().max(200).default(100), before: z.string().optional(),
       sort: z.enum(["smart", "date"]).default("smart"),
+      focus: z.enum(["0", "1"]).default("0"),
     }), req.query);
     const db = await getDb();
     let query = db.selectFrom("threads")
@@ -48,6 +53,8 @@ export async function threadRoutes(app: FastifyInstance) {
     if (q.status === "scheduling") query = query.where("threads.scheduling", "=", 1);
     if (q.status === "needs-review") query = query.where("draft_versions.confidence", "!=", "high");
     if (q.before) query = query.where("threads.last_message_at", "<", q.before);
+    // Focused: hide newsletters, FYI and "other" mail unless it's urgent (untriaged mail stays visible)
+    if (q.focus === "1") query = query.where((eb) => eb.or([eb("threads.category", "is", null), eb("threads.category", "not in", LOW_VALUE), eb("threads.urgent", "=", 1)]));
     if (q.label) query = query.where("threads.id", "in", db.selectFrom("messages").select("thread_id").where("labels_json", "like", `%"${q.label}"%`));
     if (q.q) {
       const like = `%${q.q}%`;
@@ -145,6 +152,35 @@ export async function threadRoutes(app: FastifyInstance) {
     await audit("user", "thread.no_reply", "thread", id);
     emit("thread", { threadId: id });
     return { ok: true };
+  });
+
+  // Junk: future mail from this sender (or their whole domain) skips the inbox; this thread and their other
+  // open threads move to Skipped. spam=true also moves this thread to Gmail's Spam folder.
+  app.post("/api/threads/:id/junk", async (req) => {
+    const { id } = req.params as { id: string };
+    const b = parse(z.object({ scope: z.enum(["sender", "domain"]).default("sender"), spam: z.boolean().default(false) }), req.body ?? {});
+    const db = await getDb();
+    const thread = await db.selectFrom("threads").selectAll().where("id", "=", id).executeTakeFirst();
+    if (!thread) throw notFound();
+    const from = await db.selectFrom("messages").select("from_email").where("thread_id", "=", id).where("is_from_me", "=", 0).orderBy("date", "desc").executeTakeFirst();
+    if (!from) throw new HttpError(400, "No incoming message in this thread");
+    const email = from.from_email.toLowerCase();
+    const match = b.scope === "domain" ? `@${email.split("@")[1]}` : email;
+    if (b.scope === "domain" && PERSONAL_PROVIDERS.test(match)) throw new HttpError(400, "That's a personal email provider — block just this sender instead");
+    if (!(await db.selectFrom("sender_rules").select("id").where("match", "=", match).where("action", "=", "skip").executeTakeFirst()))
+      await db.insertInto("sender_rules").values({ id: crypto.randomUUID(), match, action: "skip", value: null, created_at: now() }).execute();
+    const senderThreads = db.selectFrom("messages").select("thread_id").where("is_from_me", "=", 0)
+      .where("from_email", b.scope === "domain" ? "like" : "=", b.scope === "domain" ? `%${match}` : email);
+    const moved = await db.updateTable("threads").set({ state: "skipped", updated_at: now() })
+      .where((eb) => eb.or([eb("id", "=", id), eb.and([eb("state", "=", "open"), eb("id", "in", senderThreads)])])).executeTakeFirst();
+    for (const d of await db.selectFrom("drafts").select("id").where("thread_id", "=", id).where("status", "in", ["active", "saved"]).execute()) await discardDraft(d.id);
+    if (b.spam) {
+      const acc = await db.selectFrom("accounts").selectAll().where("id", "=", thread.account_id).executeTakeFirstOrThrow();
+      await mailFor(acc).modifyThreadLabels(thread.provider_thread_id, ["SPAM"], ["INBOX"]);
+    }
+    await audit("user", "thread.junk", "thread", id, { scope: b.scope, spam: b.spam });
+    emit("thread", {});
+    return { ok: true, rule: match, moved: Number(moved.numUpdatedRows) };
   });
 
   app.post("/api/threads/:id/triage", async (req) => {

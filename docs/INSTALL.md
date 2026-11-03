@@ -42,6 +42,7 @@ Stop it with Ctrl-C. Delete `backend/data/` if you want to start fresh.
 3. **Enable the APIs:** *APIs & Services → Library*, then search for and **Enable** each of these:
    - Gmail API
    - Google Calendar API
+   - People API (for To: autocomplete from your Google contacts; optional, see below)
 4. **OAuth consent screen:** *APIs & Services → OAuth consent screen* (in newer consoles, *Google Auth Platform → Branding*).
    - User type: **External** → *Create*.
    - App name `Email Assistant`, your email as support and developer contact → *Save and continue*.
@@ -49,6 +50,8 @@ Stop it with Ctrl-C. Delete `backend/data/` if you want to start fresh.
      - `https://www.googleapis.com/auth/gmail.modify`
      - `https://www.googleapis.com/auth/calendar.readonly`
      - `https://www.googleapis.com/auth/calendar.events`
+     - `https://www.googleapis.com/auth/contacts.readonly`
+     - `https://www.googleapis.com/auth/contacts.other.readonly`
      - `openid`, `.../auth/userinfo.email`
    - **Test users:** add your own Gmail address (the only user).
    - Leave the app in **Testing**. Don't publish it. In Testing mode, Google may expire the refresh token after 7 days. If that happens, the app shows "Reconnect Google" and sends you a notification; one tap fixes it. To avoid it, you can submit the app for verification. For a single private user, reconnecting occasionally is the simpler choice.
@@ -58,7 +61,9 @@ Stop it with Ctrl-C. Delete `backend/data/` if you want to start fresh.
    - *Create*, then copy the **Client ID** and **Client secret** into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 6. Put your Anthropic key in `.env` as `ANTHROPIC_API_KEY`.
 
-Why these scopes (see DECISIONS.md #30): `gmail.modify` reads mail, writes drafts and labels, and covers sending a draft (used only by the confirmed Send button). `calendar.readonly` provides free/busy. `calendar.events` creates the tentative events you ask for. Nothing else is requested.
+Why these scopes (see DECISIONS.md #30): `gmail.modify` reads mail, writes drafts and labels, and covers sending a draft (used only by the confirmed Send button). `calendar.readonly` provides free/busy. `calendar.events` creates the tentative events you ask for. The two read-only contacts scopes (DECISIONS.md #47) fill the To: autocomplete from your saved Google contacts and Gmail's "Other contacts". Nothing else is requested.
+
+**Already set up before contacts were added?** Enable the People API, add the two contacts scopes on the *Data access* page, then press **Settings → Accounts & Google → Connect / reconnect Google** and allow access. Until then, autocomplete still works from the people in your synced mail, and Settings → Contacts says the Google part isn't allowed yet.
 
 ## 3. Run the server
 

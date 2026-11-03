@@ -159,7 +159,36 @@ const m001: Migration = {
   },
 };
 
-export const migrations: Record<string, Migration> = { "001_initial": m001 };
+/** New-email drafts (not replies), Gmail contacts for address autocomplete, and the to-do list. */
+const m002: Migration = {
+  async up(db: Kysely<any>) {
+    await chain(db.schema.createTable("compose_drafts"), id,
+      (t) => txt(t, "account_id"), (t) => txt(t, "from_email"), (t) => txt(t, "to_json", true, "[]"), (t) => txt(t, "cc_json", true, "[]"),
+      (t) => txt(t, "bcc_json", true, "[]"), (t) => txt(t, "subject", true, ""), (t) => txt(t, "body", true, ""),
+      (t) => txt(t, "provider_draft_id", false), (t) => txt(t, "status", true, "open"), (t) => txt(t, "created_at"), (t) => txt(t, "updated_at")).execute();
+
+    await chain(db.schema.createTable("contacts"), id,
+      (t) => txt(t, "account_id"), (t) => txt(t, "email"), (t) => txt(t, "name", false), (t) => txt(t, "source"),
+      (t) => int(t, "times_contacted"), (t) => txt(t, "last_contacted_at", false), (t) => txt(t, "updated_at")).execute();
+    await db.schema.createIndex("contacts_account_email_idx").on("contacts").columns(["account_id", "email"]).unique().execute();
+
+    await chain(db.schema.createTable("projects"), id,
+      (t) => txt(t, "name"), (t) => txt(t, "color", true, "teal"), (t) => txt(t, "notes", true, ""), (t) => real(t, "position"),
+      (t) => int(t, "archived"), (t) => txt(t, "created_at"), (t) => txt(t, "updated_at")).execute();
+
+    await chain(db.schema.createTable("tasks"), id,
+      (t) => txt(t, "project_id", false), (t) => txt(t, "parent_id", false), (t) => txt(t, "title"), (t) => txt(t, "notes", true, ""),
+      (t) => txt(t, "status", true, "open"), (t) => int(t, "priority"), (t) => txt(t, "due_date", false), (t) => real(t, "position"),
+      (t) => txt(t, "thread_id", false), (t) => txt(t, "created_at"), (t) => txt(t, "updated_at"), (t) => txt(t, "completed_at", false)).execute();
+    await db.schema.createIndex("tasks_parent_idx").on("tasks").column("parent_id").execute();
+    await db.schema.createIndex("tasks_project_idx").on("tasks").column("project_id").execute();
+  },
+  async down(db: Kysely<any>) {
+    for (const t of ["tasks", "projects", "contacts", "compose_drafts"]) await db.schema.dropTable(t).ifExists().execute();
+  },
+};
+
+export const migrations: Record<string, Migration> = { "001_initial": m001, "002_compose_contacts_tasks": m002 };
 
 export class StaticMigrationProvider implements MigrationProvider {
   async getMigrations() { return migrations; }

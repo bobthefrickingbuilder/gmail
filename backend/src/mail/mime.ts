@@ -79,6 +79,8 @@ export interface ReplyInput {
   from: Address;
   to: Address[];
   cc: Address[];
+  /** New emails only; Gmail strips the Bcc header when it sends. */
+  bcc?: Address[];
   subject: string;
   inReplyTo: string | null;
   references: string | null;
@@ -99,6 +101,7 @@ export function buildReplyMime(r: ReplyInput, boundarySeed: string = crypto.rand
     `From: ${formatAddress(r.from)}`,
     `To: ${r.to.map(formatAddress).join(", ")}`,
     ...(r.cc.length ? [`Cc: ${r.cc.map(formatAddress).join(", ")}`] : []),
+    ...(r.bcc?.length ? [`Bcc: ${r.bcc.map(formatAddress).join(", ")}`] : []),
     `Subject: ${encodeHeaderWord(r.subject)}`,
     ...(r.inReplyTo ? [`In-Reply-To: ${r.inReplyTo}`] : []),
     ...(r.references ? [`References: ${r.references}`] : []),

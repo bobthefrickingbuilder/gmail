@@ -17,7 +17,7 @@ export class MockMailProvider implements MailProvider {
   historyCounter = 1000;
   labels = new Map<string, string>([["INBOX", "INBOX"], ["SENT", "SENT"], ["UNREAD", "UNREAD"]]);
   threadLabels = new Map<string, Set<string>>();
-  drafts = new Map<string, { threadId: string; raw: string; messageId: string }>();
+  drafts = new Map<string, { threadId: string | null; raw: string; messageId: string }>();
   sent: { draftId: string; raw: string }[] = [];
   /** minimum history id still available (to simulate expiry) */
   minHistory = 0;
@@ -94,13 +94,13 @@ export class MockMailProvider implements MailProvider {
       this.history.push({ id: ++this.historyCounter, messageId: m.id, labelIds: m.labelIds });
     }
   }
-  async createDraft(threadId: string, raw: string) {
+  async createDraft(threadId: string | null, raw: string) {
     const draftId = `d${++this.draftSeq}`;
     const messageId = `dm${this.draftSeq}`;
     this.drafts.set(draftId, { threadId, raw, messageId });
     return { draftId, messageId };
   }
-  async updateDraft(draftId: string, threadId: string, raw: string) {
+  async updateDraft(draftId: string, threadId: string | null, raw: string) {
     const d = this.drafts.get(draftId);
     if (!d) throw Object.assign(new Error("mock: draft not found"), { code: 404 });
     this.drafts.set(draftId, { ...d, threadId, raw });
@@ -113,7 +113,7 @@ export class MockMailProvider implements MailProvider {
     if (!d) throw new Error("mock: draft not found");
     this.sent.push({ draftId, raw: d.raw });
     this.drafts.delete(draftId);
-    return { messageId: `sent-${draftId}`, threadId: d.threadId };
+    return { messageId: `sent-${draftId}`, threadId: d.threadId ?? `t-sent-${draftId}` };
   }
   /** Helper for tests: decoded MIME of a draft. */
   draftMime(draftId: string) { return this.drafts.get(draftId)?.raw ?? null; }

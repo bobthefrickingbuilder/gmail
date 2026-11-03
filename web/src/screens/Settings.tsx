@@ -21,6 +21,32 @@ interface SettingsResp { settings: S; models: { default_draft_model: string; mod
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const list = (s: string) => s.split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
 
+interface ContactsStatus { last_sync_at: string | null; google: "ok" | "needs_permission" | "error" | "never"; count: number; error?: string }
+
+/** Address autocomplete source: Google contacts (needs the contacts permission) + everyone in your synced mail. */
+function ContactsSection({ flash }: { flash: (t: string, k?: "info" | "error") => void }) {
+  const st = useApi<ContactsStatus>("/api/contacts/status");
+  const [busy, setBusy] = useState(false);
+  const s = st.data;
+  return (
+    <Section title="Contacts (address autocomplete)">
+      {s && <p className="small">{s.count} contacts{s.last_sync_at ? ` · refreshed ${dateTime(s.last_sync_at)}` : " · not built yet"}
+        {" "}<span className={`badge ${s.google === "ok" ? "ok" : s.google === "never" ? "" : "warn"}`}>{s.google === "ok" ? "Google contacts connected" : s.google === "needs_permission" ? "Google contacts not allowed yet" : s.google === "error" ? "Google contacts error" : "not checked"}</span></p>}
+      {s?.google === "needs_permission" && <div className="small">
+        <p style={{ marginTop: 0 }}>Autocomplete works now from people in your mail. To also include your saved Google contacts (like Gmail does), one-time setup:</p>
+        <ol style={{ margin: ".2rem 0 .6rem" }}>
+          <li>In Google Cloud Console → APIs &amp; Services → Library, enable the <strong>People API</strong> for this app's project.</li>
+          <li>Under Google Auth Platform → Data access, add the scopes <code>…/auth/contacts.readonly</code> and <code>…/auth/contacts.other.readonly</code>.</li>
+          <li>Press <strong>Connect / reconnect Google</strong> above and allow contacts access, then Refresh below.</li>
+        </ol></div>}
+      {s?.error && <p className="error-text small">{s.error}</p>}
+      <button className="btn" disabled={busy} onClick={async () => { setBusy(true); try { await api("/api/contacts/sync", { method: "POST" }); await st.reload(); flash("Contacts refreshed"); } catch (e) { flash((e as Error).message, "error"); } finally { setBusy(false); } }}>
+        {busy ? <span className="spinner" /> : "↻"} Refresh contacts</button>
+      <p className="small muted">Refreshes by itself every 6 hours. Read only: the app never changes your Google contacts.</p>
+    </Section>
+  );
+}
+
 function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return <details className="card" id={id}><summary><h3 style={{ display: "inline" }}>{title}</h3></summary><div style={{ marginTop: ".5rem" }}>{children}</div></details>;
 }
@@ -31,7 +57,7 @@ export function Settings() {
   const { msg, flash } = useFlash();
   const [s, setS] = useState<S | null>(null);
   useEffect(() => { if (data) setS(data.settings); }, [data]);
-  if (!data || !s) return <div className="empty">Loading…</div>;
+  if (!data || !s) return <div className="empty"><span className="spinner" /></div>;
   const save = async (patch: Partial<S>) => {
     setS({ ...s, ...patch });
     try { await api("/api/settings", { method: "PUT", body: patch }); flash("Saved"); if (patch.theme) document.documentElement.dataset.theme = patch.theme === "system" ? "" : patch.theme; }
@@ -53,6 +79,8 @@ export function Settings() {
           <p className="row"><button className="btn primary" onClick={async () => { const r = await api<{ url: string | null; mock?: boolean }>("/api/google/connect"); if (r.url) window.open(r.url, "_blank"); else flash("Mock mode: Google is simulated"); }}>Connect / reconnect Google</button>
             {status.data?.accounts.filter((a) => a.provider === "google").map((a) => <button key={a.id} className="btn danger" onClick={() => { if (confirm("Disconnect this Google account?")) void api("/api/google/disconnect", { method: "POST", body: { accountId: a.id } }).then(() => status.reload()); }}>Disconnect {a.email}</button>)}</p>
         </Section>
+
+        <ContactsSection flash={flash} />
 
         <Section title="Models & drafting">
           <table><thead><tr><th>Key</th><th>Model ID</th><th className="num">$ in / out per M tokens</th></tr></thead>

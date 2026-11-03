@@ -1,9 +1,11 @@
-/** CALENDAR ROUTES — agenda/week events, availability preview, quick-add / tentative events (only on your tap). */
+/** CALENDAR ROUTES — agenda/week/month events, availability preview, quick-add / tentative events (only on your tap),
+ *  and "scan emails for events" (POST /api/calendar/scan: lists candidates only; adding is a separate tap per event). */
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { parse, HttpError } from "../http.js";
 import { addTentativeEvent, availabilityFor, primaryAccount } from "../calendar/service.js";
 import { calendarFor } from "../providers/index.js";
+import { scanEmailsForEvents } from "../calendar/scan.js";
 import { getSettings } from "../settings.js";
 
 export async function calendarRoutes(app: FastifyInstance) {
@@ -28,9 +30,14 @@ export async function calendarRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/calendar/events", async (req) => {
-    const b = parse(z.object({ title: z.string().min(1).max(200), kind: z.enum(["concert", "rehearsal", "meeting", "lesson", "other"]).default("other"),
+    const b = parse(z.object({ title: z.string().min(1).max(200), kind: z.enum(["concert", "rehearsal", "meeting", "lesson", "deadline", "other"]).default("other"),
       start: z.string(), end: z.string().nullable().optional(), durationMinutes: z.number().optional(), description: z.string().max(2000).optional(),
-      location: z.string().max(300).optional(), calendarId: z.string().optional() }), req.body);
+      location: z.string().max(300).optional(), calendarId: z.string().optional(), allDay: z.boolean().optional() }), req.body);
     return addTentativeEvent(b);
+  });
+
+  app.post("/api/calendar/scan", { config: { rateLimit: { max: 6, timeWindow: "1 minute" } } }, async (req) => {
+    const b = parse(z.object({ days: z.number().int().min(1).max(60).default(14) }), req.body ?? {});
+    return scanEmailsForEvents({ days: b.days });
   });
 }

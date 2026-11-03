@@ -49,7 +49,8 @@ export class GoogleCalendarProvider implements CalendarProvider {
   async createEvent(calendarId: string, ev: NewEvent) {
     const r = await this.call((c) => c.events.insert({ calendarId, requestBody: {
       summary: ev.summary, description: ev.description, location: ev.location, status: ev.tentative ? "tentative" : "confirmed",
-      start: { dateTime: ev.start, timeZone: ev.timeZone }, end: { dateTime: ev.end, timeZone: ev.timeZone },
+      ...(ev.allDay ? { start: { date: ev.start }, end: { date: ev.end } }
+        : { start: { dateTime: ev.start, timeZone: ev.timeZone }, end: { dateTime: ev.end, timeZone: ev.timeZone } }),
     } }));
     return { id: r.data.id!, htmlLink: r.data.htmlLink ?? null };
   }

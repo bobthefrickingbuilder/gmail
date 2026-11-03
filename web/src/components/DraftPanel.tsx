@@ -12,11 +12,7 @@ import { dateTime, flagLabel, modelLabel, money } from "../format";
 import type { Address, ThreadDetail, Version } from "../types";
 import { CompareView } from "./CompareView";
 import { SendDialog } from "./SendDialog";
-
-const parseAddrs = (s: string): Address[] => s.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean).map((x) => {
-  const m = x.match(/^(.*)<([^>]+)>$/); return m ? { name: m[1].trim().replace(/^"|"$/g, "") || null, email: m[2].trim() } : { name: null, email: x };
-});
-const fmtAddrs = (a: Address[]) => a.map((x) => (x.name ? `${x.name} <${x.email}>` : x.email)).join(", ");
+import { RecipientInput } from "./RecipientInput";
 
 /** Voice dictation hook (v1: uses the browser's speech recognition where available). */
 function useDictation(onText: (t: string) => void) {
@@ -29,8 +25,8 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
   const current: Version | undefined = d.versions.find((v) => v.id === d.draft?.current_version_id) ?? d.versions[0];
   const [body, setBody] = useState(current?.body ?? "");
   const [subject, setSubject] = useState(current?.subject ?? "");
-  const [to, setTo] = useState(fmtAddrs(d.draft?.to ?? []));
-  const [cc, setCc] = useState(fmtAddrs(d.draft?.cc ?? []));
+  const [to, setTo] = useState<Address[]>(d.draft?.to ?? []);
+  const [cc, setCc] = useState<Address[]>(d.draft?.cc ?? []);
   const [instruction, setInstruction] = useState("");
   const [startSonnet, setStartSonnet] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -41,7 +37,7 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
   const dictate = useDictation((t) => setInstruction((i) => (i ? `${i} ${t}` : t)));
 
   useEffect(() => { setBody(current?.body ?? ""); setSubject(current?.subject ?? ""); }, [current?.id]);
-  useEffect(() => { setTo(fmtAddrs(d.draft?.to ?? [])); setCc(fmtAddrs(d.draft?.cc ?? [])); }, [d.draft?.id, d.draft?.reply_mode, JSON.stringify(d.draft?.to)]);
+  useEffect(() => { setTo(d.draft?.to ?? []); setCc(d.draft?.cc ?? []); }, [d.draft?.id, d.draft?.reply_mode, JSON.stringify(d.draft?.to)]);
   useEffect(() => { if (insertText) { setBody((b) => insertAvailability(b, insertText)); onInserted(); } }, [insertText]);
 
   const run = async (label: string, fn: () => Promise<unknown>, ok?: string) => {
@@ -49,9 +45,9 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
     try { await fn(); if (ok) flash(ok); reload(); } catch (e) { flash((e as Error).message, "error"); } finally { setBusy(null); }
   };
   const draft = (model: string) => run("draft", () => api(`/api/threads/${d.thread.id}/draft`, { method: "POST", body: { model, instruction: instruction || null } }), `Drafted with ${modelLabel(model)}`);
-  const saveEdits = async () => {
+  const saveEdits = async (recips: { to?: Address[]; cc?: Address[] } = {}) => {
     if (!d.draft) return;
-    const r = await api<{ queued?: boolean }>(`/api/drafts/${d.draft.id}`, { method: "PUT", offlineQueue: true, body: { body, subject, to: parseAddrs(to), cc: parseAddrs(cc) } });
+    const r = await api<{ queued?: boolean }>(`/api/drafts/${d.draft.id}`, { method: "PUT", offlineQueue: true, body: { body, subject, to: recips.to ?? to, cc: recips.cc ?? cc } });
     return r;
   };
   const onBodyChange = (v: string) => {
@@ -101,9 +97,9 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
               onClick={() => run("mode", () => api(`/api/drafts/${draftId}`, { method: "PUT", body: { reply_mode: m } }))}>{m === "reply" ? "Reply" : "Reply all"}</button>)}
           </div>
           <label htmlFor="to" className="muted" style={{ margin: 0, fontWeight: 400 }}>To</label>
-          <input id="to" type="text" value={to} onChange={(e) => setTo(e.target.value)} onBlur={() => void saveEdits()} />
+          <RecipientInput id="to" value={to} onChange={(v) => { setTo(v); void saveEdits({ to: v }); }} />
           <label htmlFor="cc" className="muted" style={{ margin: 0, fontWeight: 400 }}>Cc</label>
-          <input id="cc" type="text" value={cc} onChange={(e) => setCc(e.target.value)} onBlur={() => void saveEdits()} />
+          <RecipientInput id="cc" value={cc} onChange={(v) => { setCc(v); void saveEdits({ cc: v }); }} />
           <label htmlFor="subj" className="muted" style={{ margin: 0, fontWeight: 400 }}>Subject</label>
           <input id="subj" type="text" value={subject} onChange={(e) => setSubject(e.target.value)} onBlur={() => void saveEdits()} />
         </div>

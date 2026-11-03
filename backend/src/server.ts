@@ -28,6 +28,8 @@ import { peopleRoutes } from "./routes/people.js";
 import { calendarRoutes } from "./routes/calendar.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { systemRoutes } from "./routes/system.js";
+import { composeRoutes } from "./routes/compose.js";
+import { taskRoutes } from "./routes/tasks.js";
 import { log } from "./log.js";
 
 /** Routes that do not need a login. Everything else under /api does. */
@@ -97,6 +99,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(calendarRoutes);
   await app.register(settingsRoutes);
   await app.register(systemRoutes);
+  await app.register(composeRoutes);
+  await app.register(taskRoutes);
 
   // Serve the web app (PWA) if it has been built.
   const webDist = e.WEB_DIST_DIR ?? path.join(REPO_ROOT, "web", "dist");

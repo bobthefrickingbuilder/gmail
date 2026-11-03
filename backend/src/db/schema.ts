@@ -302,6 +302,59 @@ export interface SendConfirmationsTable {
   created_at: string;
 }
 
+export interface ComposeDraftsTable {
+  id: string;
+  account_id: string;
+  from_email: string;
+  to_json: string;
+  cc_json: string;
+  bcc_json: string;
+  subject: string;
+  body: string;
+  provider_draft_id: string | null;
+  status: string; // open | saved | sent | discarded
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactsTable {
+  id: string;
+  account_id: string;
+  email: string;
+  name: string | null;
+  source: string; // google (saved contact) | other (Gmail "other contacts") | mail (seen in synced mail)
+  times_contacted: number;
+  last_contacted_at: string | null;
+  updated_at: string;
+}
+
+export interface ProjectsTable {
+  id: string;
+  name: string;
+  color: string; // a palette name (teal, blue, violet, pink, orange, amber, green, slate)
+  notes: string;
+  position: number;
+  archived: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TasksTable {
+  id: string;
+  project_id: string | null; // null = no project ("Inbox")
+  parent_id: string | null; // set = a subtask (steps can nest)
+  title: string;
+  notes: string;
+  status: string; // open | done
+  priority: number; // 0 none, 1 low, 2 medium, 3 high
+  due_date: string | null; // YYYY-MM-DD
+  position: number;
+  thread_id: string | null; // the email this task came from
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
 export interface DB {
   accounts: AccountsTable;
   threads: ThreadsTable;
@@ -326,4 +379,8 @@ export interface DB {
   sessions: SessionsTable;
   push_subscriptions: PushSubscriptionsTable;
   send_confirmations: SendConfirmationsTable;
+  compose_drafts: ComposeDraftsTable;
+  contacts: ContactsTable;
+  projects: ProjectsTable;
+  tasks: TasksTable;
 }

@@ -10,6 +10,9 @@
  *                     (send is only ever used by the confirmed Send button)
  *   calendar.readonly list calendars, free/busy, read events
  *   calendar.events   create the tentative events you ask for
+ *   contacts.readonly, contacts.other.readonly
+ *                     your Google contacts, for address autocomplete when you write
+ *                     an email (read only; see DECISIONS.md #47)
  */
 import { google } from "googleapis";
 import type { OAuth2Client, Credentials } from "google-auth-library";
@@ -22,6 +25,8 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/contacts.readonly",
+  "https://www.googleapis.com/auth/contacts.other.readonly",
   "openid",
   "email",
 ];

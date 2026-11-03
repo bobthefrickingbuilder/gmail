@@ -25,6 +25,7 @@ import { runSeedJob } from "../profiles/seed.js";
 import { audit } from "../audit.js";
 import { log } from "../log.js";
 import { localDate } from "../time.js";
+import { syncContactsIfStale } from "../contacts/service.js";
 
 export const workerState = {
   running: false,
@@ -137,7 +138,7 @@ async function resumeJobs() {
 }
 
 async function loop() {
-  try { await pollOnce(); await nightly(); } catch (e) { log.error({ err: (e as Error).message }, "worker tick failed"); }
+  try { await pollOnce(); await nightly(); await syncContactsIfStale().catch((e) => log.warn({ err: (e as Error).message }, "contacts refresh failed")); } catch (e) { log.error({ err: (e as Error).message }, "worker tick failed"); }
   const s = await getSettings().catch(() => ({ polling_interval_seconds: 120 }));
   timer = setTimeout(loop, Math.max(30, s.polling_interval_seconds) * 1000);
 }

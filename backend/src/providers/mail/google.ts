@@ -93,13 +93,13 @@ export class GoogleMailProvider implements MailProvider {
     await this.call((g) => g.users.threads.modify({ userId: "me", id: threadId, requestBody: { addLabelIds: add, removeLabelIds: remove } }));
   }
 
-  async createDraft(threadId: string, rawMime: string) {
-    const r = await this.call((g) => g.users.drafts.create({ userId: "me", requestBody: { message: { raw: b64urlEncode(rawMime), threadId } } }));
+  async createDraft(threadId: string | null, rawMime: string) {
+    const r = await this.call((g) => g.users.drafts.create({ userId: "me", requestBody: { message: { raw: b64urlEncode(rawMime), ...(threadId ? { threadId } : {}) } } }));
     return { draftId: r.data.id!, messageId: r.data.message?.id ?? "" };
   }
 
-  async updateDraft(draftId: string, threadId: string, rawMime: string) {
-    const r = await this.call((g) => g.users.drafts.update({ userId: "me", id: draftId, requestBody: { id: draftId, message: { raw: b64urlEncode(rawMime), threadId } } }));
+  async updateDraft(draftId: string, threadId: string | null, rawMime: string) {
+    const r = await this.call((g) => g.users.drafts.update({ userId: "me", id: draftId, requestBody: { id: draftId, message: { raw: b64urlEncode(rawMime), ...(threadId ? { threadId } : {}) } } }));
     return { draftId: r.data.id!, messageId: r.data.message?.id ?? "" };
   }
 

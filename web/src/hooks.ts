@@ -46,3 +46,18 @@ export function useFlash() {
   const flash = useCallback((text: string, kind: "info" | "error" = "info") => { setMsg({ text, kind }); setTimeout(() => setMsg(null), 4000); }, []);
   return { msg, flash };
 }
+
+/** App-wide toast (bottom of the screen). */
+type ToastListener = (t: { text: string; kind: "info" | "error" } | null) => void;
+const toastListeners = new Set<ToastListener>();
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+export function toast(text: string, kind: "info" | "error" = "info") {
+  toastListeners.forEach((l) => l({ text, kind }));
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastListeners.forEach((l) => l(null)), 3500);
+}
+export function useToast() {
+  const [t, setT] = useState<{ text: string; kind: "info" | "error" } | null>(null);
+  useEffect(() => { toastListeners.add(setT); return () => { toastListeners.delete(setT); }; }, []);
+  return t;
+}

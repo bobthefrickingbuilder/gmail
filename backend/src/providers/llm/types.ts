@@ -7,7 +7,7 @@ import type { z } from "zod";
 
 export interface LlmRequest<T extends z.ZodType> {
   modelKey: string;
-  purpose: "triage" | "draft" | "profile" | "seed" | "learn" | "eval";
+  purpose: "triage" | "draft" | "profile" | "seed" | "learn" | "eval" | "task";
   system: string;
   user: string;
   schema: T;

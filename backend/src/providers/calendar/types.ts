@@ -5,7 +5,8 @@ export interface CalendarEvent {
   id: string; calendarId: string; summary: string; start: string; end: string;
   allDay: boolean; location: string | null; status: string; transparency: string | null;
 }
-export interface NewEvent { summary: string; start: string; end: string; description?: string; location?: string; tentative: boolean; timeZone: string }
+/** allDay: start/end are dates (YYYY-MM-DD), end exclusive. */
+export interface NewEvent { summary: string; start: string; end: string; description?: string; location?: string; tentative: boolean; timeZone: string; allDay?: boolean }
 
 export interface CalendarProvider {
   listCalendars(): Promise<CalendarInfo[]>;

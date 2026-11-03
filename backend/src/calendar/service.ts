@@ -82,10 +82,19 @@ export async function schedulingCard(threadId: string): Promise<SchedulingCard |
 }
 
 /** Only ever called from an explicit "Add to calendar" tap. */
-export async function addTentativeEvent(input: { title: string; kind: string; start: string; end?: string | null; description?: string; location?: string; calendarId?: string; durationMinutes?: number }) {
+export async function addTentativeEvent(input: { title: string; kind: string; start: string; end?: string | null; description?: string; location?: string; calendarId?: string; durationMinutes?: number; allDay?: boolean }) {
   const acc = await primaryAccount();
   if (!acc) throw new Error("No account connected");
   const s = await getSettings();
+  if (input.allDay) { // whole-day event: dates only, end exclusive
+    const day = input.start.slice(0, 10);
+    const endDay = input.end && input.end.slice(0, 10) > day ? input.end.slice(0, 10) : addDays(day, 1);
+    const summary = normalizeEventTitle(input.title, input.kind);
+    const res = await calendarFor(acc).createEvent(input.calendarId ?? "primary", { summary, start: day, end: endDay, allDay: true,
+      description: input.description, location: input.location, tentative: true, timeZone: s.timezone });
+    await audit("user", "calendar.create_event", "event", res.id, { kind: input.kind, tentative: true, all_day: true });
+    return { ...res, summary };
+  }
   const end = input.end ?? new Date(new Date(input.start).getTime() + (input.durationMinutes ?? 120) * 60000).toISOString();
   const summary = normalizeEventTitle(input.title, input.kind);
   const res = await calendarFor(acc).createEvent(input.calendarId ?? "primary", { summary, start: new Date(input.start).toISOString(),

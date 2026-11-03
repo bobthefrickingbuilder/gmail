@@ -124,7 +124,7 @@ export function subscribeEvents(onEvent: (type: string, data: Record<string, unk
       const { ticket } = await api<{ ticket: string }>("/api/events/ticket", { method: "POST" });
       if (stopped) return;
       es = new EventSource(`${apiBase()}/api/events?ticket=${encodeURIComponent(ticket)}`);
-      for (const t of ["draft", "thread", "sync", "profile", "attention", "job"])
+      for (const t of ["draft", "thread", "sync", "profile", "attention", "job", "compose", "tasks"])
         es.addEventListener(t, (e) => onEvent(t, JSON.parse((e as MessageEvent).data || "{}")));
       es.onerror = () => { es?.close(); if (!stopped) retry = setTimeout(connect, 10_000); };
     } catch { if (!stopped) retry = setTimeout(connect, 15_000); }

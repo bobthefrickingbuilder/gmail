@@ -103,6 +103,30 @@ export class MockLlmProvider implements LlmProvider {
       case "style_learning":
         return { patterns: [{ pattern: "Shortens the first paragraph", evidence_count: 2 }], summary: "Mock: you tend to shorten openings.",
           proposed_style_guide: (req.user.match(/<style_guide>\n([\s\S]*?)\n<\/style_guide>/)?.[1] ?? "") + "\n- Keep the opening to one sentence." };
+      case "event_scan": {
+        // Mock: an email mentioning a rehearsal/concert/meeting/lesson on a weekday → that day next week at 19:00 UTC
+        const out: unknown[] = [];
+        for (const m of req.user.matchAll(/<email index="(\d+)"[^>]*subject="([^"]*)">\n([\s\S]*?)\n<\/email>/g)) {
+          const text = m[2] + "\n" + m[3];
+          const kind = /concert/i.test(text) ? "concert" : /rehearsal|répétition/i.test(text) ? "rehearsal" : /lesson/i.test(text) ? "lesson" : /meeting/i.test(text) ? "meeting" : null;
+          const day = text.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+          if (!kind || !day) continue;
+          const idx = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].indexOf(day[1].toLowerCase());
+          const d = new Date(); d.setUTCDate(d.getUTCDate() + ((idx - d.getUTCDay() + 7) % 7) + 7); d.setUTCHours(19, 0, 0, 0);
+          out.push({ email_index: Number(m[1]), title: kind === "rehearsal" ? "Rehearsal: " + m[2].slice(0, 40) : m[2].slice(0, 60), start: d.toISOString(), end: null,
+            all_day: false, location: null, kind, confidence: "medium", evidence: day[0] });
+        }
+        return { events: out };
+      }
+      case "task_breakdown": {
+        const title = req.user.match(/<task title="([^"]*)"/)?.[1] ?? "the task";
+        return { steps: [
+          { title: `List what "${title}" needs`, notes: null },
+          { title: "Confirm dates and people involved", notes: "Find out anything still unknown." },
+          { title: "Do the first piece of work", notes: null },
+          { title: "Review and wrap up", notes: null },
+        ] };
+      }
       default:
         throw new Error(`Mock LLM has no handler for schema ${req.schemaName}`);
     }
