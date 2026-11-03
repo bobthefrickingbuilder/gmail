@@ -10,7 +10,11 @@ declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: { url: string; r
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
-self.addEventListener("message", (e) => { if (e.data === "SKIP_WAITING") void self.skipWaiting(); });
+// "Reload now?" → OK. vite-plugin-pwa sends { type: "SKIP_WAITING" }; the plain string is accepted too.
+self.addEventListener("message", (e) => {
+  const d = e.data as unknown;
+  if (d === "SKIP_WAITING" || (typeof d === "object" && d !== null && (d as { type?: string }).type === "SKIP_WAITING")) void self.skipWaiting();
+});
 
 self.addEventListener("push", (event) => {
   let data: { title?: string; body?: string; url?: string; tag?: string } = {};
