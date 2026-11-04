@@ -363,6 +363,43 @@ export interface ThreadAnalysisTable {
   created_at: string;
 }
 
+/** A chat with Claude (chat/service.ts). */
+export interface ChatConversationsTable {
+  id: string;
+  title: string; // first words of your first message
+  model_key: string; // key in config/models.json
+  context_thread_id: string | null; // set when started with "Ask Claude about this email"
+  tainted: number; // 1 once a tool returned text that looked like instructions to an AI: from then on every change asks first
+  created_at: string;
+  updated_at: string;
+}
+
+/** One Messages-API message of a chat, in order. Kept append-only so the model's history never changes. */
+export interface ChatMessagesTable {
+  id: string;
+  conversation_id: string;
+  seq: number;
+  role: "user" | "assistant";
+  content_json: string; // ChatBlock[] exactly as sent to / received from the model
+  ui_json: string | null; // what the app shows: { text } for your messages, { activity: [...] } for tool results
+  created_at: string;
+}
+
+/** A change the chat proposed that waits for your Confirm tap (discard, junk, calendar, bulk…). */
+export interface ChatActionsTable {
+  id: string;
+  conversation_id: string;
+  tool: string;
+  input_json: string; // validated tool input; this exact input runs on Confirm
+  summary: string; // "Discard the draft “Re: Lunch”"
+  status: "pending" | "done" | "cancelled" | "failed";
+  result_json: string | null;
+  error: string | null;
+  reported: number; // 1 once the outcome was passed back to the model in a later turn
+  created_at: string;
+  decided_at: string | null;
+}
+
 export interface DB {
   accounts: AccountsTable;
   threads: ThreadsTable;
@@ -392,4 +429,7 @@ export interface DB {
   projects: ProjectsTable;
   tasks: TasksTable;
   thread_analysis: ThreadAnalysisTable;
+  chat_conversations: ChatConversationsTable;
+  chat_messages: ChatMessagesTable;
+  chat_actions: ChatActionsTable;
 }

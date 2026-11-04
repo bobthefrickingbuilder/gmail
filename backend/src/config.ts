@@ -90,9 +90,11 @@ export const ModelsConfig = z.object({
   triage_model: z.string(),
   profile_model: z.string(),
   learning_model: z.string(),
+  /** Model for the in-app chat (you can pick another per chat). */
+  chat_model: z.string().default("opus"),
   escalation_order: z.array(z.string()),
   models: z.record(z.string(), ModelEntry),
-  max_output_tokens: z.object({ draft: z.number(), triage: z.number(), profile: z.number(), learn: z.number() }),
+  max_output_tokens: z.object({ draft: z.number(), triage: z.number(), profile: z.number(), learn: z.number(), chat: z.number().default(8000) }),
 });
 export type ModelsConfig = z.infer<typeof ModelsConfig>;
 export type ModelKey = string;

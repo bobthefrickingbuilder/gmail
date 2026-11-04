@@ -18,7 +18,7 @@ are stored as text so the same schema works in SQLite and Postgres.
 | `profile_versions` | History of every profile change | `person_id`, `version`, `snapshot_json`, `source` (`model`/`user`/`seed`/`merge`), `status` (`applied`/`proposed`/`rejected`/`reverted`) |
 | `pinned_docs` | Per-person context documents | `person_id`, `title`, `content` |
 | `sender_rules` | Your skip/VIP/escalate rules | `match` (address, `@domain`, or label), `action` (`skip`/`vip`/`escalate`/`category`), `value` |
-| `usage` | Every model call | `purpose` (`triage`/`draft`/`profile`/`seed`/`learn`/`eval`), `model_key`, tokens, `cost_usd`, `thread_id` |
+| `usage` | Every model call | `purpose` (`triage`/`draft`/`profile`/`seed`/`learn`/`eval`/`task`/`chat`), `model_key`, tokens, `cost_usd`, `thread_id` |
 | `settings` | Key/value app settings | `key`, `value_json` |
 | `audit_log` | Every action, no email content | `actor`, `action`, `target_type`, `target_id`, `meta_json` |
 | `dead_letters` | Failures needing attention | `kind`, `ref_id`, `error`, `attempts`, `resolved_at` |
@@ -34,6 +34,11 @@ are stored as text so the same schema works in SQLite and Postgres.
 | `projects` | To-do projects | `name`, `color`, `notes`, `position`, `archived` |
 | `tasks` | To-do tasks; `parent_id` makes a task a step of another | `project_id`, `parent_id`, `title`, `status`, `priority`, `due_date`, `thread_id`, `completed_at` |
 | `thread_analysis` | To-do / calendar suggestions found in an email (one row per thread) | `message_id` (the message analysed), `items_json` (suggestions and which you added or hid), `model` |
+| `chat_conversations` | Chats with Claude (Chat tab) | `title`, `model_key`, `context_thread_id` (chat started from an email), `tainted` (1 once suspicious email text was seen: every change then asks first) |
+| `chat_messages` | Each chat message in order, append-only | `conversation_id`, `seq`, `role`, `content_json` (exactly what was sent to / received from the model), `ui_json` (what the screen shows) |
+| `chat_actions` | Changes the chat proposed that wait for your Confirm tap | `tool`, `input_json` (runs exactly this on Confirm), `summary`, `status` (`pending`/`done`/`cancelled`/`failed`), `reported` |
+
+Chats quote email text, so they follow the retention setting (a chat untouched for N days is deleted), are included in **Export**, and are deleted by **Wipe**.
 
 **Idempotency:** `messages` has a unique index on `(account_id, provider_message_id)`;
 drafting checks `drafts` for an active draft on the thread and *updates* it

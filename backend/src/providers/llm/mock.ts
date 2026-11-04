@@ -4,7 +4,8 @@
  * exercised for free. It reads the same prompts the real model would get.
  */
 import type { z } from "zod";
-import type { LlmProvider, LlmRequest, LlmResult } from "./types.js";
+import type { ChatBlock, ChatRequest, ChatResponse, LlmProvider, LlmRequest, LlmResult } from "./types.js";
+import { mockChatTurn } from "./mock-chat.js";
 import { getModels } from "../../settings.js";
 import { priceFor } from "../../usage/cost.js";
 
@@ -37,6 +38,22 @@ export class MockLlmProvider implements LlmProvider {
     const outputTokens = Math.ceil(JSON.stringify(raw).length / 4);
     return { data, modelKey: req.modelKey, modelId, inputTokens, outputTokens,
       costUsd: await priceFor(req.modelKey, inputTokens, outputTokens), attempts, fellBack: false };
+  }
+
+  /** Chat: tests can queue exact model turns (content blocks, or a function of the request); otherwise mock-chat.ts plays the model. */
+  public chatQueue: (ChatBlock[] | ((req: ChatRequest) => ChatBlock[]))[] = [];
+  public chatCalls: ChatRequest[] = [];
+
+  async chat(req: ChatRequest): Promise<ChatResponse> {
+    this.chatCalls.push(structuredClone(req));
+    const modelId = (await getModels()).models[req.modelKey]?.id ?? req.modelKey;
+    const queued = this.chatQueue.shift();
+    const turn = queued ? (() => { const content = typeof queued === "function" ? queued(req) : queued; return { content, stopReason: content.some((b) => b.type === "tool_use") ? "tool_use" : "end_turn" }; })()
+      : mockChatTurn(req);
+    const inputTokens = Math.ceil((req.system.length + JSON.stringify(req.messages).length + JSON.stringify(req.tools).length) / 4);
+    const outputTokens = Math.ceil(JSON.stringify(turn.content).length / 4);
+    return { content: turn.content, stopReason: turn.stopReason, modelKey: req.modelKey, modelId, inputTokens, outputTokens,
+      costUsd: await priceFor(req.modelKey, inputTokens, outputTokens), fellBack: false };
   }
 
   private produce(req: LlmRequest<z.ZodType>): unknown {

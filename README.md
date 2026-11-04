@@ -30,6 +30,19 @@ For real mail, follow **[docs/INSTALL.md](docs/INSTALL.md)**.
 
 Every 2 minutes the server asks Gmail what's new. Each email goes through **rules** (newsletters, no-reply and bulk mail are skipped for free), then a quick **Haiku** classification (needs reply, scheduling, urgent…). For reply-worthy mail, it gathers the thread, the person's profile, your style guide, a few of your past replies, and (only for scheduling) your free time slots. It asks Claude for a draft as structured JSON, checks it (no fabricated facts, no leaking your schedule, no extra sign-off), and saves it as a Gmail draft in the right thread. The app shows the draft with its confidence, open questions and flags. You edit, redraft with Sonnet or Opus, save, or send.
 
+## Chat with Claude
+
+The **Chat** tab (or **✦ Ask Claude** on an email) lets you ask in plain words: "archive everything from this sender", "add a to-do from this email", "draft a reply to Raj saying yes", "move the dentist email to Done", "label these as invoices", "add this to my calendar", "discard that draft". Claude does it with the app's own actions and shows a line for each one, with links to the emails and drafts it touched.
+
+| What you ask | What happens |
+|---|---|
+| Find, read, summarise; to-dos; labels; Done/Snooze/read for up to 3 emails | Runs straight away |
+| Write or change a draft (reply or new email) | Saved to Gmail Drafts — **never sent**; you send it from the email screen as usual |
+| Discard a draft, block/junk a sender, add a calendar event, change more than 3 emails | A **Confirm / Cancel** card; nothing happens until you tap Confirm |
+| Anything after an email in the chat looked like it was giving an AI instructions | Every change asks first (a ⚠ banner says why) |
+
+Pick the model per chat (default in `config/models.json` → `chat_model`). Chats are kept until you delete them or your retention period passes.
+
 ## Repository layout
 
 | Folder | What's inside |

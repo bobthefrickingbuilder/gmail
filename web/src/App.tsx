@@ -26,11 +26,13 @@ import { Share } from "./screens/Share";
 import { ComposeList, ComposeEditor } from "./screens/Compose";
 import { Todo } from "./screens/Todo";
 import { DraftsList } from "./screens/Drafts";
+import { ChatList, ChatView } from "./screens/Chat";
 import { registerPush, checkForUpdate } from "./platform";
 import { APP_VERSION } from "./config";
 
 const NAV = [
   { name: "inbox", label: "Inbox", ico: "✉︎" },
+  { name: "chat", label: "Chat", ico: "✦" },
   { name: "drafts", label: "Drafts", ico: "❐" },
   { name: "todo", label: "To-do", ico: "☑︎" },
   { name: "calendar", label: "Calendar", ico: "▦" },
@@ -108,7 +110,13 @@ export function App() {
         : <div className="stack"><DraftsList wide={false} /></div>;
       break;
     }
-    case "todo": body = <div className="stack"><Todo key="todo" view={route.id ?? "today"} /></div>; break;
+    case "chat":
+      body = wide
+        ? <div className="three" style={{ gridTemplateColumns: "minmax(280px, 25%) minmax(0, 1fr)" }}><div className="pane"><ChatList selected={route.id} /></div>
+            {route.id ? <ChatView key={route.id} id={route.id} split /> : <div className="pane empty"><span className="big">✦</span>Pick a chat, or start a new one.</div>}</div>
+        : route.id ? <div className="stack chat-stack"><ChatView key={route.id} id={route.id} /></div> : <div className="stack"><ChatList /></div>;
+      break;
+    case "todo": body =<div className="stack"><Todo key="todo" view={route.id ?? "today"} /></div>; break;
     case "people": body = <div className="stack"><People /></div>; break;
     case "person": body = <div className="stack"><PersonView id={route.id!} /></div>; break;
     case "calendar": body = <div className="stack"><CalendarView /></div>; break;

@@ -4,6 +4,7 @@
   "triage_model": "haiku",
   "profile_model": "haiku",
   "learning_model": "sonnet",
+  "chat_model": "opus",
   "escalation_order": ["haiku", "sonnet", "opus"],
   "models": {
     "haiku": {
@@ -31,5 +32,5 @@
       "serverFallback": true
     }
   },
-  "max_output_tokens": { "draft": 8000, "triage": 1500, "profile": 3000, "learn": 6000 }
+  "max_output_tokens": { "draft": 8000, "triage": 1500, "profile": 3000, "learn": 6000, "chat": 8000 }
 }

@@ -95,7 +95,8 @@ export async function systemRoutes(app: FastifyInstance) {
   app.get("/api/export", async (req, reply) => {
     const db = await getDb();
     const tables = ["accounts", "threads", "messages", "triage", "triage_corrections", "drafts", "draft_versions", "people", "person_addresses",
-      "profile_versions", "pinned_docs", "sender_rules", "usage", "settings", "audit_log", "style_proposals"] as const;
+      "profile_versions", "pinned_docs", "sender_rules", "usage", "settings", "audit_log", "style_proposals",
+      "chat_conversations", "chat_messages", "chat_actions"] as const;
     const out: Record<string, unknown[]> = {};
     for (const t of tables) out[t] = await db.selectFrom(t).selectAll().execute();
     out.accounts = (out.accounts as Record<string, unknown>[]).map((a) => ({ ...a, tokens_enc: undefined })); // never export tokens
@@ -108,7 +109,7 @@ export async function systemRoutes(app: FastifyInstance) {
     const db = await getDb();
     const u = await db.selectFrom("auth_user").selectAll().executeTakeFirst();
     if (!u?.password_hash || !verifyPassword(b.password, u.password_hash)) throw new HttpError(401, "Wrong password");
-    const tables = ["send_confirmations", "push_subscriptions", "style_proposals", "jobs", "dead_letters", "usage", "sender_rules", "pinned_docs",
+    const tables = ["chat_actions", "chat_messages", "chat_conversations", "send_confirmations", "push_subscriptions", "style_proposals", "jobs", "dead_letters", "usage", "sender_rules", "pinned_docs",
       "profile_versions", "person_addresses", "people", "draft_versions", "drafts", "triage_corrections", "triage", "messages", "threads", "accounts", "settings"] as const;
     for (const t of tables) await db.deleteFrom(t).execute();
     if (b.includeLogin) for (const t of ["sessions", "webauthn_credentials", "auth_user", "audit_log"] as const) await db.deleteFrom(t).execute();

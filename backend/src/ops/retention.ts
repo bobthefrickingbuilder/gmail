@@ -23,6 +23,11 @@ export async function purgeOldBodies(days?: number) {
       .where("id", "=", r.id).execute();
   }
   await db.deleteFrom("send_confirmations").where("expires_at", "<", new Date(Date.now() - 86400_000).toISOString()).execute();
-  if (rows.length) await audit("system", "retention.purge", null, null, { messages: rows.length, days: keep });
+  // Chats quote email text, so a chat untouched for the same N days is deleted too.
+  const oldChats = db.selectFrom("chat_conversations").select("id").where("updated_at", "<", cutoff);
+  await db.deleteFrom("chat_actions").where("conversation_id", "in", oldChats).execute();
+  await db.deleteFrom("chat_messages").where("conversation_id", "in", oldChats).execute();
+  const chats = await db.deleteFrom("chat_conversations").where("updated_at", "<", cutoff).executeTakeFirst();
+  if (rows.length || Number(chats.numDeletedRows)) await audit("system", "retention.purge", null, null, { messages: rows.length, chats: Number(chats.numDeletedRows), days: keep });
   return rows.length;
 }

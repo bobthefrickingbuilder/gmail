@@ -10,6 +10,7 @@ import { buttonState } from "../drafting/models.js";
 import { schedulingCard } from "../calendar/service.js";
 import { parseIcs } from "../mail/ics.js";
 import { mailFor } from "../providers/index.js";
+import { listThreads, setThreadState, setThreadRead, junkSender, changeThreadLabels } from "../threads/service.js";
 import { audit } from "../audit.js";
 import { emit } from "../notify/sse.js";
 import { discardDraft } from "../drafting/service.js";
@@ -19,8 +20,7 @@ import { stripQuotedText } from "../mail/quotes.js";
 import { analyzeThread, addSuggestion, dismissSuggestion } from "../analysis/service.js";
 import type { SendAs } from "../providers/mail/types.js";
 
-export const LOW_VALUE = ["newsletter", "fyi", "other"];
-const PERSONAL_PROVIDERS = /^@(gmail|googlemail|outlook|hotmail|live|yahoo|icloud|me|proton|protonmail)\.[a-z.]+$/;
+export { LOW_VALUE } from "../threads/service.js";
 
 export async function threadRoutes(app: FastifyInstance) {
   app.get("/api/threads", async (req) => {
@@ -32,48 +32,7 @@ export async function threadRoutes(app: FastifyInstance) {
       sort: z.enum(["smart", "date"]).default("smart"),
       focus: z.enum(["0", "1"]).default("0"),
     }), req.query);
-    const db = await getDb();
-    let query = db.selectFrom("threads")
-      .leftJoin("people", "people.id", "threads.person_id")
-      .leftJoin("drafts", (j) => j.onRef("drafts.thread_id", "=", "threads.id").on("drafts.status", "in", ["active", "saved"]))
-      .leftJoin("draft_versions", "draft_versions.id", "drafts.current_version_id")
-      .select(["threads.id", "threads.subject", "threads.last_message_at", "threads.state", "threads.snooze_until", "threads.category",
-        "threads.priority", "threads.summary", "threads.urgent", "threads.scheduling", "threads.draft_status", "threads.needs_attention",
-        "threads.person_id", "people.display_name as person_name", "people.vip as person_vip", "drafts.id as draft_id", "drafts.status as draft_state",
-        "draft_versions.confidence", "draft_versions.flags_json", "draft_versions.open_questions_json",
-        sql<number>`exists(select 1 from messages m where m.thread_id = threads.id and m.is_from_me = 0 and m.labels_json like '%"UNREAD"%')`.as("unread")]);
-    if (q.view === "inbox") query = query.where("threads.state", "=", "open");
-    else if (q.view === "attention") query = query.where("threads.needs_attention", "=", 1);
-    else if (q.view !== "all") query = query.where("threads.state", "=", q.view === "snoozed" ? "snoozed" : q.view);
-    if (q.category) query = query.where("threads.category", "=", q.category);
-    if (q.person) query = query.where("threads.person_id", "=", q.person);
-    if (q.model) query = query.where("threads.draft_status", "=", `drafted:${q.model}`);
-    if (q.status === "drafted") query = query.where("threads.draft_status", "like", "drafted:%");
-    if (q.status === "undrafted") query = query.where("threads.draft_status", "=", "none");
-    if (q.status === "urgent") query = query.where("threads.urgent", "=", 1);
-    if (q.status === "scheduling") query = query.where("threads.scheduling", "=", 1);
-    if (q.status === "needs-review") query = query.where("draft_versions.confidence", "!=", "high");
-    if (q.before) query = query.where("threads.last_message_at", "<", q.before);
-    // Focused: hide newsletters, FYI and "other" mail unless it's urgent (untriaged mail stays visible)
-    if (q.focus === "1") query = query.where((eb) => eb.or([eb("threads.category", "is", null), eb("threads.category", "not in", LOW_VALUE), eb("threads.urgent", "=", 1)]));
-    if (q.label) query = query.where("threads.id", "in", db.selectFrom("messages").select("thread_id").where("labels_json", "like", `%"${q.label}"%`));
-    if (q.q) {
-      const like = `%${q.q}%`;
-      query = query.where((eb) => eb.or([eb("threads.subject", "like", like), eb("threads.summary", "like", like), eb("people.display_name", "like", like),
-        eb("threads.id", "in", db.selectFrom("messages").select("thread_id").where((e2) => e2.or([e2("from_email", "like", like), e2("stripped_text", "like", like)])))]));
-    }
-    if (q.sort === "smart") query = query.orderBy("threads.urgent", "desc");
-    const rows = await query.orderBy("threads.last_message_at", "desc").limit(q.limit).execute();
-    const ids = rows.map((r) => r.id);
-    const latest = ids.length ? await db.selectFrom("messages").select(["thread_id", "from_name", "from_email", "snippet", "date", "is_from_me"])
-      .where("thread_id", "in", ids).orderBy("date", "desc").execute() : [];
-    const latestBy = new Map<string, (typeof latest)[number]>();
-    for (const m of latest) if (!latestBy.has(m.thread_id)) latestBy.set(m.thread_id, m);
-    return rows.map((r) => ({
-      ...r, urgent: r.urgent === 1, scheduling: r.scheduling === 1, needs_attention: r.needs_attention === 1, person_vip: r.person_vip === 1, unread: r.unread === 1,
-      flags: pj<string[]>(r.flags_json, []), open_questions: pj<string[]>(r.open_questions_json, []).length, flags_json: undefined, open_questions_json: undefined,
-      latest: latestBy.get(r.id) ?? null,
-    }));
+    return listThreads({ ...q, focus: q.focus === "1" });
   });
 
   app.get("/api/threads/:id", async (req) => {
@@ -117,11 +76,7 @@ export async function threadRoutes(app: FastifyInstance) {
   app.post("/api/threads/:id/state", async (req) => {
     const { id } = req.params as { id: string };
     const b = parse(z.object({ state: z.enum(["open", "done", "snoozed", "skipped"]), snooze_until: z.string().nullable().optional() }), req.body);
-    const db = await getDb();
-    await db.updateTable("threads").set({ state: b.state, snooze_until: b.state === "snoozed" ? b.snooze_until ?? new Date(Date.now() + 86400_000).toISOString() : null,
-      needs_attention: b.state === "open" ? undefined : 0, updated_at: now() }).where("id", "=", id).execute();
-    await audit("user", `thread.${b.state}`, "thread", id);
-    emit("thread", { threadId: id });
+    await setThreadState(id, b.state, b.snooze_until);
     return { ok: true };
   });
 
@@ -129,16 +84,7 @@ export async function threadRoutes(app: FastifyInstance) {
   app.post("/api/threads/:id/read", async (req) => {
     const { id } = req.params as { id: string };
     const b = parse(z.object({ read: z.boolean() }), req.body);
-    const db = await getDb();
-    const thread = await db.selectFrom("threads").select(["account_id", "provider_thread_id"]).where("id", "=", id).executeTakeFirst();
-    if (!thread) throw notFound();
-    const acc = await db.selectFrom("accounts").selectAll().where("id", "=", thread.account_id).executeTakeFirstOrThrow();
-    await mailFor(acc).modifyThreadLabels(thread.provider_thread_id, b.read ? [] : ["UNREAD"], b.read ? ["UNREAD"] : []);
-    for (const m of await db.selectFrom("messages").select(["id", "labels_json"]).where("thread_id", "=", id).execute()) {
-      const labels = pj<string[]>(m.labels_json, []).filter((l) => l !== "UNREAD");
-      await db.updateTable("messages").set({ labels_json: JSON.stringify(b.read ? labels : [...labels, "UNREAD"]) }).where("id", "=", m.id).execute();
-    }
-    emit("thread", { threadId: id });
+    await setThreadRead(id, b.read);
     return { ok: true };
   });
 
@@ -160,28 +106,16 @@ export async function threadRoutes(app: FastifyInstance) {
   app.post("/api/threads/:id/junk", async (req) => {
     const { id } = req.params as { id: string };
     const b = parse(z.object({ scope: z.enum(["sender", "domain"]).default("sender"), spam: z.boolean().default(false) }), req.body ?? {});
-    const db = await getDb();
-    const thread = await db.selectFrom("threads").selectAll().where("id", "=", id).executeTakeFirst();
-    if (!thread) throw notFound();
-    const from = await db.selectFrom("messages").select("from_email").where("thread_id", "=", id).where("is_from_me", "=", 0).orderBy("date", "desc").executeTakeFirst();
-    if (!from) throw new HttpError(400, "No incoming message in this thread");
-    const email = from.from_email.toLowerCase();
-    const match = b.scope === "domain" ? `@${email.split("@")[1]}` : email;
-    if (b.scope === "domain" && PERSONAL_PROVIDERS.test(match)) throw new HttpError(400, "That's a personal email provider — block just this sender instead");
-    if (!(await db.selectFrom("sender_rules").select("id").where("match", "=", match).where("action", "=", "skip").executeTakeFirst()))
-      await db.insertInto("sender_rules").values({ id: crypto.randomUUID(), match, action: "skip", value: null, created_at: now() }).execute();
-    const senderThreads = db.selectFrom("messages").select("thread_id").where("is_from_me", "=", 0)
-      .where("from_email", b.scope === "domain" ? "like" : "=", b.scope === "domain" ? `%${match}` : email);
-    const moved = await db.updateTable("threads").set({ state: "skipped", updated_at: now() })
-      .where((eb) => eb.or([eb("id", "=", id), eb.and([eb("state", "=", "open"), eb("id", "in", senderThreads)])])).executeTakeFirst();
-    for (const d of await db.selectFrom("drafts").select("id").where("thread_id", "=", id).where("status", "in", ["active", "saved"]).execute()) await discardDraft(d.id);
-    if (b.spam) {
-      const acc = await db.selectFrom("accounts").selectAll().where("id", "=", thread.account_id).executeTakeFirstOrThrow();
-      await mailFor(acc).modifyThreadLabels(thread.provider_thread_id, ["SPAM"], ["INBOX"]);
-    }
-    await audit("user", "thread.junk", "thread", id, { scope: b.scope, spam: b.spam });
-    emit("thread", {});
-    return { ok: true, rule: match, moved: Number(moved.numUpdatedRows) };
+    const r = await junkSender(id, b.scope, b.spam);
+    return { ok: true, ...r };
+  });
+
+  // Your own Gmail labels on a thread (created in Gmail if missing)
+  app.post("/api/threads/:id/labels", async (req) => {
+    const { id } = req.params as { id: string };
+    const b = parse(z.object({ add: z.array(z.string().max(100)).max(10).default([]), remove: z.array(z.string().max(100)).max(10).default([]) }), req.body ?? {});
+    await changeThreadLabels(id, b.add, b.remove);
+    return { ok: true };
   });
 
   app.post("/api/threads/:id/triage", async (req) => {

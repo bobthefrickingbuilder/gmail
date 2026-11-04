@@ -29,6 +29,7 @@ npm run typecheck
 | Seeding job (resumable), learning (proposal only), retention, push payload privacy, quiet hours, escalation rules, Anthropic provider (no tools, structured output, retry, refusal, fallback) | `backend/test/jobs.test.ts` |
 | Eval checks (fabrication, disclosure, threading, signature…) | `backend/test/eval.test.ts` |
 | Download page auth/escaping, version check, cron secret | `backend/test/download.test.ts` |
+| **Chat**: tools run through the real services (archive, to-do, reply draft, labels, context email); history persisted and append-only; discard/junk/calendar/bulk wait for Confirm, Confirm runs once, Cancel; no send tool and no import path to `send.ts` (static); injected instructions in an email become proposals and taint the chat; system/AI labels refused; validation and rate limit | `backend/test/chat.test.ts` |
 | Web: router, availability insertion, send dialog only sends after explicit tap | `web/test/ui.test.tsx` |
 
 ## Mock mode
