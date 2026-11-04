@@ -25,11 +25,13 @@ import { SearchView } from "./screens/Search";
 import { Share } from "./screens/Share";
 import { ComposeList, ComposeEditor } from "./screens/Compose";
 import { Todo } from "./screens/Todo";
+import { DraftsList } from "./screens/Drafts";
 import { registerPush, checkForUpdate } from "./platform";
 import { APP_VERSION } from "./config";
 
 const NAV = [
   { name: "inbox", label: "Inbox", ico: "✉︎" },
+  { name: "drafts", label: "Drafts", ico: "❐" },
   { name: "todo", label: "To-do", ico: "☑︎" },
   { name: "calendar", label: "Calendar", ico: "▦" },
   { name: "people", label: "People", ico: "☺︎" },
@@ -96,6 +98,16 @@ export function App() {
             {route.id ? <ComposeEditor key={route.id} id={route.id} split /> : <div className="pane empty"><span className="big">✎</span>Pick an email, or start a new one.</div>}</div>
         : <div className="stack">{route.id ? <ComposeEditor key={route.id} id={route.id} /> : <ComposeList />}</div>;
       break;
+    case "drafts": {
+      const [kind, ...rest] = (route.id ?? "").split(":"); const openId = rest.join(":");
+      body = wide
+        ? <div className="three"><div className="pane"><DraftsList selected={route.id} wide /></div>
+            {kind === "reply" && openId ? <ThreadView key={openId} id={openId} split />
+              : kind === "new" && openId ? <ComposeEditor key={openId} id={openId} split />
+              : <div className="pane empty"><span className="big">❐</span>Pick a draft to review it.</div>}</div>
+        : <div className="stack"><DraftsList wide={false} /></div>;
+      break;
+    }
     case "todo": body = <div className="stack"><Todo key="todo" view={route.id ?? "today"} /></div>; break;
     case "people": body = <div className="stack"><People /></div>; break;
     case "person": body = <div className="stack"><PersonView id={route.id!} /></div>; break;

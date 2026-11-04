@@ -10,6 +10,6 @@
             android:action="android.intent.action.VIEW"
             android:targetPackage="ca.matthewmenard.assistant"
             android:targetClass="ca.matthewmenard.assistant.MainActivity"
-            android:data="assistant://open#/inbox?status=drafted" />
+            android:data="assistant://open#/drafts" />
     </shortcut>
 </shortcuts>

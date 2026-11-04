@@ -36,6 +36,11 @@ export interface ComposeDraft {
   id: string; from_email: string; to: Address[]; cc: Address[]; bcc: Address[]; subject: string; body: string; status: string; saved: boolean;
   provider_draft_id: string | null; created_at: string; updated_at: string;
 }
+/** One row of GET /api/drafts: a reply draft (kind "reply") or a new email you started (kind "new"). */
+export interface DraftRow {
+  kind: "reply" | "new"; id: string; thread_id: string | null; subject: string; to: Address[]; person_name: string | null; preview: string;
+  origin: string | null; model_key: string | null; confidence: string | null; flags: string[]; open_questions: number; in_gmail: boolean; updated_at: string;
+}
 export interface Project { id: string; name: string; color: string; notes: string; position: number; archived: boolean; created_at: string }
 export interface Task {
   id: string; project_id: string | null; parent_id: string | null; title: string; notes: string; status: "open" | "done"; priority: number;

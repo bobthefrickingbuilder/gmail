@@ -1,5 +1,6 @@
 /**
  * DRAFT ROUTES
+ *   GET  /api/drafts                every unsent draft: replies + new emails, newest first
  *   POST /api/threads/:id/draft     draft / redraft (model + optional instruction)
  *   PUT  /api/drafts/:id            your edits (new "user" version)
  *   POST /api/drafts/:id/save       save the current version to Gmail
@@ -23,11 +24,49 @@ import { recordUsage } from "../usage/cost.js";
 import { todayString } from "../time.js";
 import { postCheck } from "../drafting/postcheck.js";
 import { INJECTION_RE } from "../security/injection.js";
+import { getDb, pj } from "../db/index.js";
 
 const Address = z.object({ name: z.string().nullable(), email: z.string().email() });
+type Addr = z.infer<typeof Address>;
+
+const preview = (body: string) => body.replace(/\s+/g, " ").trim().slice(0, 240);
 
 export async function draftRoutes(app: FastifyInstance) {
   const draftLimit = { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } };
+
+  app.get("/api/drafts", async (req) => {
+    const q = parse(z.object({ kind: z.enum(["all", "reply", "new"]).default("all"), q: z.string().max(200).optional() }), req.query);
+    const db = await getDb();
+    const replies = q.kind === "new" ? [] : await db.selectFrom("drafts")
+      .innerJoin("threads", "threads.id", "drafts.thread_id")
+      .leftJoin("draft_versions", "draft_versions.id", "drafts.current_version_id")
+      .leftJoin("people", "people.id", "threads.person_id")
+      .select(["drafts.id", "drafts.thread_id", "drafts.status", "drafts.to_json", "drafts.provider_draft_id", "drafts.updated_at",
+        "threads.subject as thread_subject", "people.display_name as person_name",
+        "draft_versions.subject", "draft_versions.body", "draft_versions.origin", "draft_versions.model_key", "draft_versions.confidence",
+        "draft_versions.flags_json", "draft_versions.open_questions_json", "draft_versions.created_at as version_at"])
+      .where("drafts.status", "in", ["active", "saved"]).orderBy("drafts.updated_at", "desc").limit(200).execute();
+    const composed = q.kind === "reply" ? [] : await db.selectFrom("compose_drafts").selectAll()
+      .where("status", "in", ["open", "saved"]).orderBy("updated_at", "desc").limit(200).execute();
+
+    const rows = [
+      ...replies.map((d) => ({
+        kind: "reply" as const, id: d.id, thread_id: d.thread_id, subject: d.subject || d.thread_subject, to: pj<Addr[]>(d.to_json, []),
+        person_name: d.person_name, preview: preview(d.body ?? ""), origin: d.origin, model_key: d.model_key, confidence: d.confidence,
+        flags: pj<string[]>(d.flags_json, []), open_questions: pj<string[]>(d.open_questions_json, []).length,
+        in_gmail: Boolean(d.provider_draft_id), updated_at: [d.updated_at, d.version_at ?? ""].sort().at(-1)!,
+      })),
+      ...composed.map((c) => ({
+        kind: "new" as const, id: c.id, thread_id: null, subject: c.subject, to: pj<Addr[]>(c.to_json, []), person_name: null,
+        preview: preview(c.body), origin: "user", model_key: null, confidence: null, flags: [] as string[], open_questions: 0,
+        in_gmail: Boolean(c.provider_draft_id), updated_at: c.updated_at,
+      })),
+    ];
+    const needle = q.q?.trim().toLowerCase();
+    return rows
+      .filter((r) => !needle || [r.subject, r.preview, r.person_name ?? "", ...r.to.flatMap((a) => [a.name ?? "", a.email])].some((s) => s.toLowerCase().includes(needle)))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  });
 
   app.post("/api/threads/:id/draft", draftLimit, async (req) => {
     const { id } = req.params as { id: string };
