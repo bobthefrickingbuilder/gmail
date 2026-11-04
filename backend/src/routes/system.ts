@@ -121,7 +121,7 @@ export async function systemRoutes(app: FastifyInstance) {
   // ---- push ----
   app.get("/api/push/vapid", async () => ({ publicKey: env().VAPID_PUBLIC_KEY ?? null, fcm: Boolean(env().FCM_SERVICE_ACCOUNT_JSON) }));
   app.post("/api/push/subscribe", async (req) => {
-    const b = parse(z.object({ kind: z.enum(["webpush", "fcm"]), endpoint: z.string().min(10), keys: z.record(z.string(), z.string()).optional() }), req.body);
+    const b = parse(z.object({ kind: z.enum(["webpush", "fcm", "apns"]), endpoint: z.string().min(10), keys: z.record(z.string(), z.string()).optional() }), req.body);
     await subscribe(b.kind, b.endpoint, b.keys ?? {});
     return { ok: true };
   });

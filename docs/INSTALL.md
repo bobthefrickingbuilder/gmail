@@ -113,7 +113,7 @@ Serverless hosting has no always-on worker. Polling is done by Vercel Cron calli
 
 ## 4. iPad: install the app (PWA)
 
-iPadOS doesn't allow installing native apps from a download outside the App Store. The supported equivalent is a Home Screen web app, which runs full-screen with its own icon.
+The simplest way is a Home Screen web app, which runs full-screen with its own icon and updates itself (below). If you'd rather have a native app installed from your PC (sideloaded with your Apple ID), see **[IOS.md](IOS.md)**.
 
 1. On the iPad, open **Safari** (it must be Safari) and go to your `PUBLIC_URL`.
 2. Tap the **Share** button (square with an arrow), then **Add to Home Screen**, then **Add**.

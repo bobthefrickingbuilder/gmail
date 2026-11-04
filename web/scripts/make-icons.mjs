@@ -91,6 +91,16 @@ function splash(file, w, h) {
   console.log("wrote", path.relative(repo, file));
 }
 
+// iOS app (ios/, see docs/IOS.md): one opaque 1024 icon (iOS rounds the corners) + the launch image.
+function iosAssets() {
+  const xc = path.join(repo, "ios/App/App/Assets.xcassets");
+  if (!fs.existsSync(xc)) return;
+  write(path.join(xc, "AppIcon.appiconset/AppIcon-512@2x.png"), 1024, { radius: 0, scale: 0.9 });
+  for (const n of ["splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"]) splash(path.join(xc, "Splash.imageset", n), 2732, 2732);
+}
+if (process.argv[2] === "ios") { iosAssets(); process.exit(0); }   // npm run icons -w web -- ios
+iosAssets();
+
 const pub = path.join(web, "public");
 write(path.join(pub, "icons/icon-192.png"), 192);
 write(path.join(pub, "icons/icon-512.png"), 512);

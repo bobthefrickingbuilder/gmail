@@ -8,6 +8,11 @@
     "captureInput": true,
     "webContentsDebuggingEnabled": false
   },
+  "ios": {
+    "path": "ios",
+    "contentInset": "never",
+    "webContentsDebuggingEnabled": false
+  },
   "server": { "androidScheme": "https" },
   "plugins": {
     "PushNotifications": { "presentationOptions": ["badge", "sound", "alert"] }

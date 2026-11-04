@@ -4,7 +4,7 @@ import { startRegistration } from "@simplewebauthn/browser";
 import { api, signOut } from "../api";
 import { apiUrl } from "../apiUrl";
 import { useApi, useFlash, useLive } from "../hooks";
-import { registerPush } from "../platform";
+import { registerPush, pushResultText } from "../platform";
 import { dateTime } from "../format";
 import { APP_VERSION } from "../config";
 
@@ -132,7 +132,7 @@ export function Settings() {
         </Section>
 
         <Section title="Notifications & polling">
-          <p><button className="btn" onClick={() => registerPush(true).then((r) => flash(r === "registered" ? "Notifications enabled on this device" : r === "unsupported" ? "On iPad, install the app to the Home Screen first (Share → Add to Home Screen)" : `Not enabled (${r})`))}>Enable notifications on this device</button></p>
+          <p><button className="btn" onClick={() => registerPush(true).then((r) => flash(pushResultText(r)))}>Enable notifications on this device</button></p>
           <label className="inline"><input type="checkbox" checked={s.notifications.urgent} onChange={(e) => save({ notifications: { ...s.notifications, urgent: e.target.checked } })} /> Urgent mail and VIP senders</label>
           <label className="inline"><input type="checkbox" checked={s.notifications.drafts} onChange={(e) => save({ notifications: { ...s.notifications, drafts: e.target.checked } })} /> Every new draft</label>
           <label className="inline"><input type="checkbox" checked={Boolean(s.notifications.quiet_hours)} onChange={(e) => save({ notifications: { ...s.notifications, quiet_hours: e.target.checked ? { start: "22:00", end: "07:30" } : null } })} /> Quiet hours</label>

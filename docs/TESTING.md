@@ -30,6 +30,7 @@ npm run typecheck
 | Eval checks (fabrication, disclosure, threading, signature…) | `backend/test/eval.test.ts` |
 | Download page auth/escaping, version check, cron secret | `backend/test/download.test.ts` |
 | **Chat**: tools run through the real services (archive, to-do, reply draft, labels, context email); history persisted and append-only; discard/junk/calendar/bulk wait for Confirm, Confirm runs once, Cancel; no send tool and no import path to `send.ts` (static); injected instructions in an email become proposals and taint the chat; system/AI labels refused; validation and rate limit | `backend/test/chat.test.ts` |
+| APNs (iOS push): off until configured, ES256 token verifies, payload is title/subject only, bad tokens dropped | `backend/test/apns.test.ts` |
 | Web: router, availability insertion, send dialog only sends after explicit tap | `web/test/ui.test.tsx` |
 
 ## Mock mode
@@ -82,6 +83,13 @@ Run through this after each release.
 - [ ] New server version deployed → "new version available" prompt → reload.
 - [ ] Larger text (Settings → Accessibility → Display & Text Size): app text scales. VoiceOver: list rows, buttons and dialogs announce sensibly.
 - [ ] Dark mode follows the system; Settings → Appearance override works.
+
+### iPad sideloaded app (docs/IOS.md)
+- [ ] Actions → "iOS app (IPA)" run is green; artifact downloads; Sideloadly installs it; Developer Mode + Trust; app opens.
+- [ ] Server address prefilled (or typed); sign in with password + TOTP; inbox, a thread, a draft, Chat all load; rotate and Split View work.
+- [ ] Long-press icon → "Drafts waiting" and "Chat with Claude" open those screens (also from a cold start).
+- [ ] Safari address bar `assistant://open#/chat` opens the app on Chat; the "Draft reply" Shortcut from the Share menu opens "Draft from shared text" with the text.
+- [ ] Free Apple ID: Settings → Enable notifications explains push isn't available. Paid build with `with_push` + `APNS_*`: test notification arrives; tapping it opens the thread.
 
 ### Android (current version and one older, e.g. 15 and 12)
 - [ ] Download page asks for the password; download; "Install unknown apps" flow; app installs.

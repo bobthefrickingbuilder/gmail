@@ -1,0 +1,78 @@
+# Builds the iPad/iPhone app as an UNSIGNED .ipa on a GitHub-hosted Mac.
+# You then sign + install it from your Windows PC with Sideloadly (or AltStore),
+# using your Apple ID. See docs/IOS.md.
+#
+# Run it: GitHub → Actions → "iOS app (IPA)" → Run workflow.
+# Download: the run's page → Artifacts → EmailAssistant-ipa.
+name: iOS app (IPA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "Server address to pre-fill (optional — you can also type it on the sign-in screen)"
+        required: false
+        default: ""
+      with_push:
+        description: "Include push notifications (only for a PAID Apple Developer account)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Use the newest Xcode on the runner
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Install packages
+        run: npm ci --ignore-scripts
+
+      - name: Build the web app
+        env:
+          VITE_API_BASE: ${{ inputs.api_base || vars.API_BASE }}
+        run: npm run build -w web
+
+      - name: Copy it into the iOS project
+        run: npx cap sync ios
+
+      - name: Compile (no signing — Sideloadly signs with your Apple ID)
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 40
+          test -d build/Build/Products/Release-iphoneos/App.app
+
+      - name: Add the push entitlement (paid account builds only)
+        if: ${{ inputs.with_push }}
+        run: codesign --force --sign - --timestamp=none --entitlements ios/App/App/App.entitlements build/Build/Products/Release-iphoneos/App.app
+
+      - name: Package .ipa
+        run: |
+          mkdir -p out/Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app out/Payload/
+          cd out && zip -qry "EmailAssistant-v${VERSION}-${{ github.run_number }}.ipa" Payload && ls -lh *.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EmailAssistant-ipa
+          path: out/*.ipa
+          retention-days: 30

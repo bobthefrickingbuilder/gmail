@@ -286,7 +286,7 @@ export interface SessionsTable {
 
 export interface PushSubscriptionsTable {
   id: string;
-  kind: string; // webpush | fcm
+  kind: string; // webpush | fcm | apns
   endpoint: string;
   keys_json: string;
   created_at: string;

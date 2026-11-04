@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import { useApi, useLive } from "../hooks";
-import { registerPush } from "../platform";
+import { registerPush, pushResultText } from "../platform";
 
 export function Onboarding() {
   const status = useApi<{ accounts: { email: string; status: string; provider: string }[]; mock: boolean }>("/api/status");
@@ -31,7 +31,7 @@ export function Onboarding() {
           {seed && <p className="small" role="status">Status: {seed.status} · {seed.progress.phase} · scanned {seed.progress.scanned ?? 0} sent emails · profiles {seed.progress.profiled ?? 0}/{seed.progress.total ?? "?"}{seed.error ? ` · ${seed.error}` : ""}</p>}
           {seed && <progress max={seed.progress.total || 1} value={seed.progress.profiled ?? 0} style={{ width: "100%" }} aria-label="Import progress" />}</>)}
         {step(3, "Review your style guide", false, <p><a className="btn" href="#/settings">Open Settings → Style guide</a></p>)}
-        {step(4, "Turn on notifications", false, <button className="btn" onClick={() => registerPush(true).then((r) => alert(r === "registered" ? "Notifications enabled" : r === "unsupported" ? "On iPad: install to Home Screen first (Share → Add to Home Screen), then try again from the installed app." : r))}>Enable notifications</button>)}
+        {step(4, "Turn on notifications", false, <button className="btn" onClick={() => registerPush(true).then((r) => alert(pushResultText(r)))}>Enable notifications</button>)}
         {step(5, "Run a test draft", Boolean(test), <>
           <button className="btn primary" onClick={async () => {
             const r = await api<{ draft_body: string }>("/api/scratch", { method: "POST", body: { text: "Hi Matthew,\n\nWould you be available to sing the bass solos in our spring concert? We rehearse on Tuesday evenings.\n\nBest,\nA conductor" } });

@@ -10,7 +10,7 @@ tap **Send** and then confirm.
 ```
                  ┌────────────────────────── your devices ──────────────────────────┐
                  │  iPad (Safari → Add to Home Screen, PWA)   Android (Capacitor APK) │
-                 │  Desktop browser (testing)                                         │
+                 │  Desktop browser   iPad app (Capacitor IPA)                        │
                  │            one shared React web app  (/web)                        │
                  └───────────────┬──────────────────────────────▲─────────────────────┘
                      HTTPS + Bearer session token                │ SSE (live updates)
@@ -77,6 +77,7 @@ tap **Send** and then confirm.
 /backend      Fastify API + worker + providers + tests + eval harness
 /web          React PWA (shared UI for iPad, Android, desktop)
 /android      Capacitor project + signed-APK build script
+/ios          Capacitor iOS project (SPM); unsigned IPA built by .github/workflows/ios.yml, sideloaded (docs/IOS.md)
 /config       models.json, style-guide.md, triage-rules.json, signature.json
 /profiles     (unused: profiles live in the DB; folder holds exports)
 /docs         INSTALL, DECISIONS, ARCHITECTURE, SECURITY, TESTING, DATA-MODEL, ...

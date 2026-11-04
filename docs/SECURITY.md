@@ -7,6 +7,7 @@
 | Anthropic API key | Server env var only | Never sent to the apps; never logged; not in the repo (pre-commit scan). |
 | Google OAuth refresh token | `accounts.tokens_enc` | AES-256-GCM with `ENCRYPTION_KEY` (env). Excluded from export. |
 | Your mail content | DB (bodies purged after N days), Gmail | Sent only to Anthropic for triage/drafting. Not in logs, audit entries or push notifications. |
+| Apple push key (`.p8`, optional) | Server env (`APNS_KEY`) only | Used to sign short-lived push tokens; never sent to the apps. The iOS build on GitHub is unsigned, so no Apple certificate or password is stored there. |
 | Login | `auth_user` | scrypt password hash; TOTP secret encrypted; passkeys (WebAuthn). |
 | Sessions | `sessions` | 15-min signed access tokens; 30-day refresh tokens stored as SHA-256 hashes, rotated on every use; reuse of an old refresh token revokes the session. |
 

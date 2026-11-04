@@ -2,7 +2,7 @@
 
 A private email assistant for one person. It reads incoming Gmail, decides what needs a reply, keeps a short profile of each correspondent, checks your Google Calendar for real availability, and writes reply drafts in your voice with Claude. Drafts land in **Gmail Drafts** for you to review. **It never sends email on its own:** sending needs a tap, then a confirmation dialog.
 
-- **iPad:** Home Screen web app (Safari → Share → Add to Home Screen)
+- **iPad:** Home Screen web app (Safari → Share → Add to Home Screen), or a native app sideloaded from your PC ([docs/IOS.md](docs/IOS.md))
 - **Android:** signed APK from your private download page
 - **Desktop:** any browser
 
@@ -50,6 +50,7 @@ Pick the model per chat (default in `config/models.json` → `chat_model`). Chat
 | `backend/` | Node + TypeScript server: API, background worker, Gmail/Calendar/Claude providers, tests, eval harness |
 | `web/` | React app (PWA): the shared UI for iPad, Android and desktop |
 | `android/` | Capacitor Android project (wraps `web/`) |
+| `ios/` | Capacitor iOS project (wraps `web/`); built on GitHub Actions, sideloaded with Sideloadly |
 | `config/` | `models.json`, `style-guide.md`, `triage-rules.json`, `signature.json`. Editable, no code changes needed |
 | `docs/` | [INSTALL](docs/INSTALL.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [DECISIONS](docs/DECISIONS.md) · [DATA-MODEL](docs/DATA-MODEL.md) · [SECURITY](docs/SECURITY.md) · [TESTING](docs/TESTING.md) |
 | `scripts/` | Setup, APK build, keystore, backup/restore, secrets-scan hook |

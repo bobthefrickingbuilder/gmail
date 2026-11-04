@@ -48,6 +48,12 @@ const EnvSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:admin@example.com"),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  /** iOS app push (Apple Push Notification service). Key = the .p8 file's contents or its path. */
+  APNS_KEY: z.string().optional(),
+  APNS_KEY_ID: z.string().optional(),
+  APNS_TEAM_ID: z.string().optional(),
+  APNS_BUNDLE_ID: z.string().default("ca.matthewmenard.assistant"),
+  APNS_PRODUCTION: bool(false),
   /** Directory that holds the APK + releases.json for the download page. */
   RELEASES_DIR: z.string().default("./data/releases"),
   /** Basic-auth password for the APK download page. */

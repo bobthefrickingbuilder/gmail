@@ -2,6 +2,7 @@
  * PUSH NOTIFICATIONS
  * - iPad PWA / desktop: Web Push (VAPID keys in env).
  * - Android app: Firebase Cloud Messaging HTTP v1 (service-account JSON in env).
+ * - iPad/iPhone app: Apple Push (APNs, .p8 key in env) — see notify/apns.ts.
  * Payloads carry ONLY a title (sender) and body (subject) — never email text.
  * Quiet hours (Settings) suppress non-critical notifications.
  */
@@ -11,6 +12,7 @@ import { env } from "../config.js";
 import { getDb, now, uid, j, pj } from "../db/index.js";
 import { getSettings } from "../settings.js";
 import { log } from "../log.js";
+import { apnsConfigured, sendApns } from "./apns.js";
 
 export interface PushPayload { title: string; body: string; url?: string; tag?: string; critical?: boolean }
 
@@ -50,6 +52,8 @@ export async function sendPush(p: PushPayload) {
         delivered++;
       } else if (sub.kind === "fcm" && env().FCM_SERVICE_ACCOUNT_JSON) {
         await sendFcm(sub.endpoint, payload); delivered++;
+      } else if (sub.kind === "apns" && apnsConfigured()) {
+        await sendApns(sub.endpoint, payload); delivered++;
       }
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode;
@@ -71,7 +75,7 @@ async function sendFcm(token: string, p: PushPayload) {
   });
 }
 
-export async function subscribe(kind: "webpush" | "fcm", endpoint: string, keys: Record<string, string> = {}) {
+export async function subscribe(kind: "webpush" | "fcm" | "apns", endpoint: string, keys: Record<string, string> = {}) {
   const db = await getDb();
   await db.deleteFrom("push_subscriptions").where("endpoint", "=", endpoint).execute();
   await db.insertInto("push_subscriptions").values({ id: uid(), kind, endpoint, keys_json: j(keys), created_at: now() }).execute();
