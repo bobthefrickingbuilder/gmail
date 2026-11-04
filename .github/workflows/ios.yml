@@ -7,6 +7,10 @@
 name: iOS app (IPA)
 
 on:
+  # Also builds automatically on every push to the iOS branch, so a build
+  # can run before the workflow is merged into the default branch.
+  push:
+    branches: [claude/ios-app]
   workflow_dispatch:
     inputs:
       api_base:
