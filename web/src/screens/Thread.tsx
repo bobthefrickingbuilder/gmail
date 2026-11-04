@@ -13,6 +13,7 @@ import type { Message, ThreadDetail } from "../types";
 import { DraftPanel } from "../components/DraftPanel";
 import { SchedulingCard } from "../components/SchedulingCard";
 import { Suggestions } from "../components/Suggestions";
+import { startChat } from "./Chat";
 
 function MessageCard({ m }: { m: Message }) {
   const [full, setFull] = useState(false);
@@ -114,6 +115,7 @@ export function ThreadView({ id, split }: { id?: string; split?: boolean }) {
         {!split && <button className="btn small" onClick={() => go("/inbox")} aria-label="Back to inbox">‹</button>}
         <h2>{d.thread.subject || "(no subject)"}</h2>
         <div className="acts">
+        <button className="btn small" onClick={() => void startChat(d.thread.id).catch((e) => toast((e as Error).message, "error"))} title="Chat with Claude about this email">✦ Ask Claude</button>
         <button className="btn small" onClick={noReply} title="Discard any draft and move to Done">No reply needed</button>
         <button className="btn small" onClick={addTodo} title="Add this email to your to-do list">☑︎ To-do</button>
         <button className="btn small" onClick={markUnread}>Mark unread</button>

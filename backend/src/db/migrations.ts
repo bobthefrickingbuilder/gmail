@@ -197,7 +197,28 @@ const m003: Migration = {
   async down(db: Kysely<any>) { await db.schema.dropTable("thread_analysis").ifExists().execute(); },
 };
 
-export const migrations: Record<string, Migration> = { "001_initial": m001, "002_compose_contacts_tasks": m002, "003_thread_analysis": m003 };
+/** 004: the in-app chat with Claude — conversations, their messages (Messages API blocks), and actions waiting for your confirmation. */
+const m004: Migration = {
+  async up(db: Kysely<any>) {
+    await chain(db.schema.createTable("chat_conversations"), id,
+      (t) => txt(t, "title", true, ""), (t) => txt(t, "model_key"), (t) => txt(t, "context_thread_id", false),
+      (t) => int(t, "tainted"), (t) => txt(t, "created_at"), (t) => txt(t, "updated_at")).execute();
+    await chain(db.schema.createTable("chat_messages"), id,
+      (t) => txt(t, "conversation_id"), (t) => int(t, "seq"), (t) => txt(t, "role"), (t) => txt(t, "content_json", true, "[]"),
+      (t) => txt(t, "ui_json", false), (t) => txt(t, "created_at")).execute();
+    await db.schema.createIndex("chat_messages_conv_idx").on("chat_messages").columns(["conversation_id", "seq"]).unique().execute();
+    await chain(db.schema.createTable("chat_actions"), id,
+      (t) => txt(t, "conversation_id"), (t) => txt(t, "tool"), (t) => txt(t, "input_json", true, "{}"), (t) => txt(t, "summary"),
+      (t) => txt(t, "status", true, "pending"), (t) => txt(t, "result_json", false), (t) => txt(t, "error", false),
+      (t) => int(t, "reported"), (t) => txt(t, "created_at"), (t) => txt(t, "decided_at", false)).execute();
+    await db.schema.createIndex("chat_actions_conv_idx").on("chat_actions").column("conversation_id").execute();
+  },
+  async down(db: Kysely<any>) {
+    for (const t of ["chat_actions", "chat_messages", "chat_conversations"]) await db.schema.dropTable(t).ifExists().execute();
+  },
+};
+
+export const migrations: Record<string, Migration> = { "001_initial": m001, "002_compose_contacts_tasks": m002, "003_thread_analysis": m003, "004_chat": m004 };
 
 export class StaticMigrationProvider implements MigrationProvider {
   async getMigrations() { return migrations; }

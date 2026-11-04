@@ -1,9 +1,11 @@
 /**
  * CLAUDE (ANTHROPIC API) PROVIDER
  * --------------------------------
- * Sends one request: a system prompt + one user message, and asks for JSON
- * that matches a schema (Anthropic "structured outputs"). No tools are ever
- * passed, so the model cannot take actions — it can only return text.
+ * complete(): one request — a system prompt + one user message — asking for
+ * JSON that matches a schema (Anthropic "structured outputs"). No tools are
+ * passed, so triage/drafting cannot take actions; they only return text.
+ * chat(): one turn of the in-app chat, with the chat tools offered. The model
+ * can only ask for a tool; chat/tools.ts decides whether and how it runs.
  *
  * Reliability:
  *  - The SDK retries rate limits (429), overloads (529) and 5xx with backoff.
@@ -17,7 +19,7 @@ import type { z } from "zod";
 import { env } from "../../config.js";
 import { getModels } from "../../settings.js";
 import { priceFor } from "../../usage/cost.js";
-import { LlmOutputError, LlmRefusalError, type LlmProvider, type LlmRequest, type LlmResult } from "./types.js";
+import { LlmOutputError, LlmRefusalError, type ChatRequest, type ChatResponse, type LlmProvider, type LlmRequest, type LlmResult } from "./types.js";
 
 export class AnthropicProvider implements LlmProvider {
   readonly kind = "anthropic";
@@ -71,5 +73,37 @@ export class AnthropicProvider implements LlmProvider {
       }
     }
     throw Object.assign(new LlmOutputError(`Model output failed validation twice: ${lastErr}`, lastRaw), { inputTokens, outputTokens });
+  }
+
+  async chat(req: ChatRequest): Promise<ChatResponse> {
+    const models = await getModels();
+    const model = models.models[req.modelKey];
+    if (!model) throw new Error(`Unknown model key "${req.modelKey}" (check config/models.json)`);
+    // History is append-only: earlier assistant turns (including thinking blocks) are sent back exactly as received.
+    const response = await this.client.beta.messages.create({
+      model: model.id,
+      max_tokens: req.maxTokens,
+      system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
+      messages: req.messages as unknown as Anthropic.Beta.BetaMessageParam[],
+      tools: req.tools.map((t, i) => ({ name: t.name, description: t.description,
+        input_schema: t.input_schema as Anthropic.Beta.BetaTool.InputSchema,
+        // cache the (static) tool list together with the system prompt
+        ...(i === req.tools.length - 1 ? { cache_control: { type: "ephemeral" as const } } : {}) })),
+      tool_choice: { type: "auto" },
+      output_config: { effort: model.effort },
+      ...(model.serverFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+    });
+    const u = response.usage;
+    const inputTokens = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+    const outputTokens = u.output_tokens ?? 0;
+    if (response.stop_reason === "refusal") {
+      throw new LlmRefusalError((response as { stop_details?: { category?: string | null } }).stop_details?.category ?? null);
+    }
+    return {
+      content: response.content as unknown as ChatResponse["content"], stopReason: response.stop_reason ?? "end_turn",
+      modelKey: req.modelKey, modelId: model.id, inputTokens, outputTokens,
+      costUsd: await priceFor(req.modelKey, inputTokens, outputTokens),
+      fellBack: Boolean(response.model && response.model !== model.id),
+    };
   }
 }

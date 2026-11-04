@@ -56,3 +56,24 @@ export type AnalysisItem =
   | { key: string; type: "todo"; title: string; due_date: string | null; notes: string | null; evidence: string; added: string | null; dismissed?: boolean }
   | { key: string; type: "event"; title: string; start: string; end: string | null; allDay: boolean; location: string | null; kind: string;
       evidence: string; source: "invite" | "ai"; added: string | null; dismissed?: boolean; alreadyOnCalendar: boolean };
+
+// ---------- in-app chat (backend chat/service.ts) ----------
+export interface ChatLink { kind: "thread" | "draft" | "compose" | "todo" | "calendar"; id: string; label: string; thread_id?: string | null }
+export interface ChatActivity { tool: string; status: "done" | "error" | "needs_confirmation" | "read"; summary: string; links: ChatLink[]; action_id?: string }
+export interface ChatAction { id: string; tool: string; summary: string; status: "pending" | "done" | "cancelled" | "failed"; error: string | null; result: ChatActivity | null; created_at: string }
+export interface ChatConversation { id: string; title: string; model: string; context_thread_id: string | null; tainted: boolean; created_at: string; updated_at: string }
+export type ChatItem =
+  | { kind: "user"; id: string; text: string; at: string }
+  | { kind: "assistant"; id: string; text: string; at: string }
+  | { kind: "activity"; id: string; activity: ChatActivity; action: ChatAction | null; at: string }
+  | { kind: "notice"; id: string; text: string; at: string };
+export interface ChatDetail { conversation: ChatConversation; items: ChatItem[]; pending: ChatAction[] }
+export interface ChatIndex { chats: ChatConversation[]; default_model: string; models: { key: string; label: string }[] }
+/** One line of the streamed reply (POST /api/chat/:id/messages). */
+export type ChatEvent =
+  | { type: "user"; id: string; text: string }
+  | { type: "text"; text: string }
+  | { type: "activity"; activity: ChatActivity; action?: ChatAction }
+  | { type: "notice"; text: string }
+  | { type: "done"; conversation: ChatConversation }
+  | { type: "error"; error: string };

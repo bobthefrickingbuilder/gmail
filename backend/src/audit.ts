@@ -5,7 +5,8 @@
  */
 import { getDb, now, uid, j } from "./db/index.js";
 
-export type Actor = "user" | "worker" | "system";
+/** "chat" = done by the in-app chat on your request (or after your Confirm tap). */
+export type Actor = "user" | "worker" | "system" | "chat";
 
 /** Keys that must never appear in audit metadata. */
 const FORBIDDEN = /body|content|text|html|snippet|token|password|secret/i;

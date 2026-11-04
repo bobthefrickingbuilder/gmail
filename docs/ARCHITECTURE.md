@@ -29,6 +29,8 @@ tap **Send** and then confirm.
 │   • calendar  free/busy, find_availability(), scheduling-intent cards                   │
 │   • learning  nightly edit-pattern summary → style-guide *proposals* (never auto-apply) │
 │   • usage     tokens + cost per draft/day/month, budget cap pauses auto-drafting        │
+│   • chat      in-app chat: Claude asks for tools that wrap the services above; no send, │
+│               risky/bulk changes wait for your Confirm tap (chat/service.ts, tools.ts)  │
 │                                                                                         │
 │  Worker (same process, timer):  poll every 2 min → sync → triage → auto-draft           │
 │     jobs: seed import (resumable), nightly learning, retention purge, health alerts     │
@@ -51,7 +53,8 @@ tap **Send** and then confirm.
 | Boundary | How it is enforced |
 |---|---|
 | No auto-send | The only code that calls Gmail *send* is `POST /api/drafts/:id/send`, which requires a fresh one-time confirmation token from `POST /api/drafts/:id/send/prepare`. The worker has no reference to the send function (`MailProvider.sendDraft` is only imported by the route). A unit test asserts the worker module never imports it. |
-| Model cannot act | Drafting and triage calls pass **no tools**. The model returns JSON; the backend stores it. Calendar writes, label changes and sends happen only from user taps. |
+| Model cannot act (drafting, triage, worker) | Drafting and triage calls pass **no tools** (`LlmProvider.complete`). The model returns JSON; the backend stores it. Calendar writes, label changes and sends happen only from user taps. |
+| In-app chat | The one place the model gets tools (`LlmProvider.chat`, only called from `chat/service.ts`, only when you type a message). Tools wrap existing services (`threads/service.ts`, `drafting/`, `compose/`, `tasks/`, `calendar/`). **There is no send tool**: a static test checks the chat code never imports `drafting/send.ts` or the draft routes. Reads and small reversible changes run at once; discarding drafts, junking/spamming a sender, calendar events and changes to more than 3 threads become a *proposal* (`chat_actions`) that runs only after your Confirm tap. Tool results containing email text go back inside `<untrusted>` markers (angle brackets neutralised); if any looks like instructions to an AI (`security/injection.ts`) the chat is marked *tainted* and **every** change from then on needs Confirm, so email text can never make a change by itself. Turns are rate-limited (20/min), every model call is in `usage` (`purpose = chat`), every change in `audit_log` (actor `chat`). |
 | Secrets stay on server | API key + Google client secret are env vars; refresh tokens are encrypted in the DB. The web bundle is built without them; a test greps the build output. |
 | Schedule privacy | The prompt only receives *free slots* (start/end), never event titles, locations or attendees, unless the user enables "share details" for that one draft. |
 | Content privacy | Logs and audit entries store IDs, counts and statuses only. Push notifications carry sender + subject only. |
@@ -81,3 +84,11 @@ tap **Send** and then confirm.
 ```
 
 See `DATA-MODEL.md` for the tables.
+
+## Request flow: a chat message
+
+1. `POST /api/chat/:id/messages {text}` (Chat tab, or "✦ Ask Claude" on an email, which starts a chat about that thread).
+2. The message is stored (`chat_messages`), plus an `<app_note>` with the outcome of any Confirm/Cancel taps since the last turn.
+3. Loop (at most 10 steps): `LlmProvider.chat` with the system rules, the stored history (append-only, sent back unchanged) and the tool list → usage recorded → for each tool the model asks for, `chat/tools.ts` validates the input and either runs it through the service, proposes it (Confirm card), or refuses it → results stored.
+4. Each step is streamed back as NDJSON (`text`, `activity`, `done`), so "Archived 3 emails" lines appear as they happen.
+5. `POST /api/chat/actions/:id/confirm` runs a proposal exactly as stored, once (claimed atomically); `…/cancel` drops it.
