@@ -18,6 +18,10 @@ function urlB64ToUint8Array(base64: string) {
 
 export async function registerPush(ask = false): Promise<string> {
   if (isNative()) {
+    // Without google-services.json, Firebase isn't initialised and calling
+    // register() crashes the app on launch, so only use push when the APK was
+    // built with Firebase (build-apk.sh sets VITE_FCM_ENABLED).
+    if (import.meta.env.VITE_FCM_ENABLED !== "true") return "unsupported";
     const { PushNotifications } = await import("@capacitor/push-notifications");
     let perm = await PushNotifications.checkPermissions();
     if (perm.receive !== "granted" && ask) perm = await PushNotifications.requestPermissions();

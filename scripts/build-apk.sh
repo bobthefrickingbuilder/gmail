@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${API_BASE:?Set API_BASE to your backend URL, e.g. API_BASE=https://mail.example.com}"
+case "$API_BASE" in https://*) ;; *) echo "API_BASE must start with https:// (Android blocks plain http, so the app could not reach the server)"; exit 1;; esac
 : "${ANDROID_HOME:=${ANDROID_SDK_ROOT:-}}"
 [ -n "$ANDROID_HOME" ] || { echo "ANDROID_HOME is not set (install Android Studio or the command-line tools)"; exit 1; }
 [ -f android/keystore.properties ] || { echo "No android/keystore.properties — run scripts/make-keystore.sh first"; exit 1; }
@@ -12,7 +13,9 @@ VERSION=$(node -p "require('./package.json').version")
 RELEASES_DIR=${RELEASES_DIR:-backend/data/releases}
 
 echo "==> Building web app for $API_BASE (v$VERSION)"
-VITE_API_BASE="$API_BASE" npm run build -w web
+FCM_ENABLED=false; [ -f android/app/google-services.json ] && FCM_ENABLED=true
+echo "Android push (Firebase): $FCM_ENABLED"
+VITE_API_BASE="$API_BASE" VITE_FCM_ENABLED="$FCM_ENABLED" npm run build -w web
 echo "==> Syncing into Android project"
 npx cap sync android
 echo "==> Gradle assembleRelease"

@@ -45,7 +45,9 @@ export function Login({ onDone }: { onDone: () => void }) {
   const [pw1, setPw1] = useState(""); const [pw2, setPw2] = useState("");
 
   const load = () => api<{ setupRequired: boolean; passkeys: number }>("/api/auth/status", { noAuth: true }).then((s) => { setStatus(s); setErr(null); })
-    .catch((e) => setErr(`Cannot reach the server${apiBase() ? ` at ${apiBase()}` : ""}: ${(e as Error).message}`));
+    .catch((e) => setErr((e as { status?: number }).status === 0
+      ? `Cannot connect to ${apiBase() || "the server"}. Check: the server computer is on and the assistant is running; Tailscale is on (on this device and the server); and the server's APP_ORIGINS includes https://localhost. Tip: open ${apiBase() || "the address"}/api/health in Chrome. If that works, it's APP_ORIGINS.`
+      : `Cannot reach the server${apiBase() ? ` at ${apiBase()}` : ""}: ${(e as Error).message}`));
   useEffect(() => { void load(); }, []);
   const done = async (t: Tokens) => { await setSession(t); onDone(); };
 
