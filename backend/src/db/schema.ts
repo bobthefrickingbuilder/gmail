@@ -400,6 +400,19 @@ export interface ChatActionsTable {
   decided_at: string | null;
 }
 
+/** A file attached to a reply draft (owner_kind "reply", owner_id = drafts.id) or a new email ("compose", compose_drafts.id). */
+export interface DraftAttachmentsTable {
+  id: string;
+  owner_kind: string; // reply | compose
+  owner_id: string;
+  filename: string;
+  mime_type: string;
+  size: number; // bytes
+  sha256: string;
+  data_b64: string; // file content, base64 (works the same on SQLite and Postgres)
+  created_at: string;
+}
+
 export interface DB {
   accounts: AccountsTable;
   threads: ThreadsTable;
@@ -432,4 +445,5 @@ export interface DB {
   chat_conversations: ChatConversationsTable;
   chat_messages: ChatMessagesTable;
   chat_actions: ChatActionsTable;
+  draft_attachments: DraftAttachmentsTable;
 }

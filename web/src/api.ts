@@ -132,3 +132,14 @@ export function subscribeEvents(onEvent: (type: string, data: Record<string, unk
   void connect();
   return () => { stopped = true; es?.close(); if (retry) clearTimeout(retry); };
 }
+
+/** Upload a file as the raw request body (attachments). Refreshes the sign-in once if it expired. */
+export async function uploadFile<T = unknown>(path: string, file: Blob): Promise<T> {
+  const doFetch = () => fetch(`${apiBase()}${path}`, { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream", ...authHeader() }, body: file });
+  let res: Response;
+  try { res = await doFetch(); } catch { throw new ApiError(0, "Couldn't upload: no connection to the server"); }
+  if (res.status === 401 && (await refresh())) res = await doFetch();
+  const data = (res.headers.get("content-type") ?? "").includes("json") ? await res.json() : await res.text();
+  if (!res.ok) throw new ApiError(res.status, res.status === 413 && !(data as { error?: string })?.error?.includes("MB") ? "File too large: Gmail allows 25 MB per email" : (data as { error?: string })?.error ?? res.statusText);
+  return data as T;
+}

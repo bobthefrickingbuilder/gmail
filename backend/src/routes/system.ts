@@ -109,7 +109,7 @@ export async function systemRoutes(app: FastifyInstance) {
     const db = await getDb();
     const u = await db.selectFrom("auth_user").selectAll().executeTakeFirst();
     if (!u?.password_hash || !verifyPassword(b.password, u.password_hash)) throw new HttpError(401, "Wrong password");
-    const tables = ["chat_actions", "chat_messages", "chat_conversations", "send_confirmations", "push_subscriptions", "style_proposals", "jobs", "dead_letters", "usage", "sender_rules", "pinned_docs",
+    const tables = ["draft_attachments", "chat_actions", "chat_messages", "chat_conversations", "send_confirmations", "push_subscriptions", "style_proposals", "jobs", "dead_letters", "usage", "sender_rules", "pinned_docs",
       "profile_versions", "person_addresses", "people", "draft_versions", "drafts", "triage_corrections", "triage", "messages", "threads", "accounts", "settings"] as const;
     for (const t of tables) await db.deleteFrom(t).execute();
     if (b.includeLogin) for (const t of ["sessions", "webauthn_credentials", "auth_user", "audit_log"] as const) await db.deleteFrom(t).execute();

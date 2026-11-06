@@ -8,6 +8,9 @@ import { authorizedClient, isAuthError } from "../../google/oauth.js";
 import { withRetry } from "../../retry.js";
 import { b64urlDecode, b64urlEncode } from "../../mail/parse.js";
 import type { GmailMessage } from "../../mail/types.js";
+
+/** Above this size (characters of MIME), drafts are uploaded instead of sent inline as JSON. */
+const UPLOAD_OVER = 4 * 1024 * 1024;
 import { AuthExpiredError, HistoryExpiredError, type MailProvider, type SendAs } from "./types.js";
 
 export class GoogleMailProvider implements MailProvider {
@@ -93,13 +96,19 @@ export class GoogleMailProvider implements MailProvider {
     await this.call((g) => g.users.threads.modify({ userId: "me", id: threadId, requestBody: { addLabelIds: add, removeLabelIds: remove } }));
   }
 
+  // Small drafts go as JSON ("raw"); drafts with big attachments use Gmail's
+  // upload endpoint (message/rfc822), which accepts up to 35 MB.
   async createDraft(threadId: string | null, rawMime: string) {
-    const r = await this.call((g) => g.users.drafts.create({ userId: "me", requestBody: { message: { raw: b64urlEncode(rawMime), ...(threadId ? { threadId } : {}) } } }));
+    const r = rawMime.length > UPLOAD_OVER
+      ? await this.call((g) => g.users.drafts.create({ userId: "me", requestBody: { message: threadId ? { threadId } : {} }, media: { mimeType: "message/rfc822", body: rawMime } }))
+      : await this.call((g) => g.users.drafts.create({ userId: "me", requestBody: { message: { raw: b64urlEncode(rawMime), ...(threadId ? { threadId } : {}) } } }));
     return { draftId: r.data.id!, messageId: r.data.message?.id ?? "" };
   }
 
   async updateDraft(draftId: string, threadId: string | null, rawMime: string) {
-    const r = await this.call((g) => g.users.drafts.update({ userId: "me", id: draftId, requestBody: { id: draftId, message: { raw: b64urlEncode(rawMime), ...(threadId ? { threadId } : {}) } } }));
+    const r = rawMime.length > UPLOAD_OVER
+      ? await this.call((g) => g.users.drafts.update({ userId: "me", id: draftId, requestBody: { id: draftId, message: threadId ? { threadId } : {} }, media: { mimeType: "message/rfc822", body: rawMime } }))
+      : await this.call((g) => g.users.drafts.update({ userId: "me", id: draftId, requestBody: { id: draftId, message: { raw: b64urlEncode(rawMime), ...(threadId ? { threadId } : {}) } } }));
     return { draftId: r.data.id!, messageId: r.data.message?.id ?? "" };
   }
 

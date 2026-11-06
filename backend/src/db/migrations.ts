@@ -218,7 +218,19 @@ const m004: Migration = {
   },
 };
 
-export const migrations: Record<string, Migration> = { "001_initial": m001, "002_compose_contacts_tasks": m002, "003_thread_analysis": m003, "004_chat": m004 };
+/** 005: files you attach to a reply draft or a new email (kept until it is sent or discarded). */
+const m005: Migration = {
+  async up(db: Kysely<any>) {
+    await chain(db.schema.createTable("draft_attachments"), id,
+      (t) => txt(t, "owner_kind"), (t) => txt(t, "owner_id"), (t) => txt(t, "filename"), (t) => txt(t, "mime_type"),
+      (t) => int(t, "size"), (t) => txt(t, "sha256"), (t) => txt(t, "data_b64"), (t) => txt(t, "created_at")).execute();
+    await db.schema.createIndex("draft_attachments_owner_idx").on("draft_attachments").columns(["owner_kind", "owner_id"]).execute();
+  },
+  async down(db: Kysely<any>) { await db.schema.dropTable("draft_attachments").ifExists().execute(); },
+};
+
+export const migrations: Record<string, Migration> = { "001_initial": m001, "002_compose_contacts_tasks": m002, "003_thread_analysis": m003, "004_chat": m004,
+  "005_draft_attachments": m005 };
 
 export class StaticMigrationProvider implements MigrationProvider {
   async getMigrations() { return migrations; }

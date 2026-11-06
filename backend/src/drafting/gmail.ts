@@ -8,6 +8,7 @@ import { getDb, now, pj } from "../db/index.js";
 import { mailFor } from "../providers/index.js";
 import { buildReferences, buildReplyMime, replySubject } from "../mail/mime.js";
 import { resolveSignature } from "./signature.js";
+import { attachmentsForMime } from "./attachments.js";
 import type { Address } from "../mail/types.js";
 import type { SendAs } from "../providers/mail/types.js";
 
@@ -35,6 +36,7 @@ export async function writeDraftToGmail(draftId: string): Promise<string> {
     subject: v.subject || replySubject(orig.subject),
     inReplyTo: orig.rfc_message_id, references: buildReferences({ references: orig.references_hdr, messageIdHeader: orig.rfc_message_id }),
     bodyText: v.body, signatureText: sig.text, signatureHtml: sig.html,
+    attachments: await attachmentsForMime("reply", draftId),
   });
   const mail = mailFor(acc);
   let providerDraftId = d.provider_draft_id;

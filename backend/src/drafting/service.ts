@@ -5,6 +5,7 @@
  */
 import { getDb, now, uid, j, pj } from "../db/index.js";
 import { writeDraftToGmail, applyThreadLabels, AI_LABELS } from "./gmail.js";
+import { clearAttachments } from "./attachments.js";
 import { mailFor } from "../providers/index.js";
 import { audit } from "../audit.js";
 import { emit } from "../notify/sse.js";
@@ -93,6 +94,7 @@ export async function discardDraft(draftId: string) {
     if (await mail.draftExists(draft.provider_draft_id)) await mail.deleteDraft(draft.provider_draft_id);
   }
   await db.updateTable("drafts").set({ status: "discarded", edit_class: "discarded", provider_draft_id: null, updated_at: now() }).where("id", "=", draftId).execute();
+  await clearAttachments("reply", draftId);
   await db.updateTable("threads").set({ draft_status: "none" }).where("id", "=", draft.thread_id).execute();
   const t = await db.selectFrom("threads").select("provider_thread_id").where("id", "=", draft.thread_id).executeTakeFirstOrThrow();
   await applyThreadLabels(acc, t.provider_thread_id, [], [AI_LABELS.drafted, AI_LABELS.review]).catch(() => undefined);

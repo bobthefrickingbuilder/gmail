@@ -1,15 +1,17 @@
 /**
  * SEND CONFIRMATION — shows exactly what will go out (from, to, cc, subject,
- * first lines). Sending needs this explicit second tap; the server rejects
+ * attached files, first lines). Sending needs this explicit second tap; the server rejects
  * a send without the one-time token this dialog receives.
  */
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { flagLabel } from "../format";
 import type { Address } from "../types";
+import { fileSize } from "./Attachments";
 
 const full = (a: Address) => (a.name ? `${a.name} <${a.email}>` : a.email);
-interface Prep { token: string; expiresInSeconds: number; from: string; to: Address[]; cc: Address[]; bcc?: Address[]; subject: string; preview: string; flags: string[]; hasPlaceholders: boolean }
+interface Prep { token: string; expiresInSeconds: number; from: string; to: Address[]; cc: Address[]; bcc?: Address[]; subject: string; preview: string; flags: string[]; hasPlaceholders: boolean;
+  attachments?: { filename: string; size: number; mime_type: string }[] }
 
 /** base: the draft's API path; replies use /api/drafts/:id, new emails /api/compose/:id. */
 export function SendDialog({ draftId, base = `/api/drafts/${draftId}`, onClose, onSent }: { draftId: string; base?: string; onClose: () => void; onSent: () => void }) {
@@ -41,6 +43,7 @@ export function SendDialog({ draftId, base = `/api/drafts/${draftId}`, onClose, 
             {prep.cc.length > 0 && <tr><th scope="row">Cc</th><td>{prep.cc.map(full).join(", ")}</td></tr>}
             {(prep.bcc?.length ?? 0) > 0 && <tr><th scope="row">Bcc</th><td>{prep.bcc!.map(full).join(", ")}</td></tr>}
             <tr><th scope="row">Subject</th><td>{prep.subject}</td></tr>
+            {(prep.attachments?.length ?? 0) > 0 && <tr><th scope="row">Files</th><td>{prep.attachments!.map((a) => `📎 ${a.filename} (${fileSize(a.size)})`).join(", ")}</td></tr>}
           </tbody></table>
           <pre className="mail card small" style={{ marginTop: ".6rem" }}>{prep.preview}{"\n…"}</pre>
           {prep.flags.length > 0 && <p className="small">{prep.flags.map((f) => <span key={f} className="badge warn" style={{ marginRight: ".3rem" }}>⚠ {flagLabel(f)}</span>)}</p>}

@@ -21,6 +21,15 @@ import { audit } from "../audit.js";
 import { emit } from "../notify/sse.js";
 import type { Address } from "../mail/types.js";
 import { getCompose, saveComposeToGmail } from "../compose/service.js";
+import { attachmentFingerprint, clearAttachments, listAttachments, type OwnerKind } from "./attachments.js";
+
+/** What the confirmation is bound to: the reviewed text plus the exact set of attached files. */
+const bindTo = async (base: string, kind: OwnerKind, id: string) => {
+  const fp = await attachmentFingerprint(kind, id);
+  return fp ? `${base}|files:${fp}` : base;
+};
+const filesFor = async (kind: OwnerKind, id: string) =>
+  (await listAttachments(kind, id)).map((a) => ({ filename: a.filename, size: a.size, mime_type: a.mime_type }));
 
 export const CONFIRM_TTL_MS = 2 * 60 * 1000;
 
@@ -36,13 +45,13 @@ export async function prepareComposeSend(composeId: string) {
   const to = pj<Address[]>(c.to_json, []);
   if (!to.length) throw new SendConfirmationError("Add at least one recipient");
   const token = randomToken(24);
-  await db.insertInto("send_confirmations").values({ id: uid(), draft_id: composeId, version_id: composeHash(c), token_hash: sha256(token),
+  await db.insertInto("send_confirmations").values({ id: uid(), draft_id: composeId, version_id: await bindTo(composeHash(c), "compose", composeId), token_hash: sha256(token),
     expires_at: new Date(Date.now() + CONFIRM_TTL_MS).toISOString(), used_at: null, created_at: now() }).execute();
   await audit("user", "send.prepare", "compose", composeId);
   return {
     token, expiresInSeconds: CONFIRM_TTL_MS / 1000, from: c.from_email, to, cc: pj<Address[]>(c.cc_json, []), bcc: pj<Address[]>(c.bcc_json, []),
     subject: c.subject || "(no subject)", preview: c.body.split("\n").filter((l) => l.trim()).slice(0, 4).join("\n"),
-    flags: [] as string[], hasPlaceholders: /\[CONFIRM:/i.test(c.body),
+    flags: [] as string[], hasPlaceholders: /\[CONFIRM:/i.test(c.body), attachments: await filesFor("compose", composeId),
   };
 }
 
@@ -54,7 +63,7 @@ export async function confirmComposeSend(composeId: string, token: string) {
   if (new Date(c.expires_at).getTime() < Date.now()) throw new SendConfirmationError("Confirmation expired — review the email again");
   const draft = await getCompose(composeId);
   if (draft.status === "sent") throw new SendConfirmationError("This email was already sent");
-  if (composeHash(draft) !== c.version_id) throw new SendConfirmationError("The email changed after you reviewed it — review again");
+  if ((await bindTo(composeHash(draft), "compose", composeId)) !== c.version_id) throw new SendConfirmationError("The email changed after you reviewed it — review again");
   if (/\[CONFIRM:/i.test(draft.body)) throw new SendConfirmationError("The email still contains [CONFIRM: …] placeholders");
   // mark used first so a double-tap cannot send twice
   const upd = await db.updateTable("send_confirmations").set({ used_at: now() }).where("id", "=", c.id).where("used_at", "is", null).executeTakeFirst();
@@ -64,6 +73,7 @@ export async function confirmComposeSend(composeId: string, token: string) {
   const acc = await db.selectFrom("accounts").selectAll().where("id", "=", draft.account_id).executeTakeFirstOrThrow();
   const sent = await mailFor(acc).sendDraft(providerDraftId);
   await db.updateTable("compose_drafts").set({ status: "sent", provider_draft_id: null, updated_at: now() }).where("id", "=", composeId).execute();
+  await clearAttachments("compose", composeId);
   await audit("user", "send", "compose", composeId, { provider_message_id: sent.messageId });
   emit("compose", { id: composeId, sent: true });
   return sent;
@@ -77,7 +87,7 @@ export async function prepareSend(draftId: string) {
   const to = pj<Address[]>(d.to_json, []);
   if (!to.length) throw new SendConfirmationError("The draft has no recipients");
   const token = randomToken(24);
-  await db.insertInto("send_confirmations").values({ id: uid(), draft_id: draftId, version_id: v.id, token_hash: sha256(token),
+  await db.insertInto("send_confirmations").values({ id: uid(), draft_id: draftId, version_id: await bindTo(v.id, "reply", draftId), token_hash: sha256(token),
     expires_at: new Date(Date.now() + CONFIRM_TTL_MS).toISOString(), used_at: null, created_at: now() }).execute();
   await audit("user", "send.prepare", "draft", draftId, { version: v.version });
   return {
@@ -85,7 +95,7 @@ export async function prepareSend(draftId: string) {
     from: d.from_email, to, cc: pj<Address[]>(d.cc_json, []), subject: v.subject,
     preview: v.body.split("\n").filter((l) => l.trim()).slice(0, 4).join("\n"),
     versionId: v.id, flags: pj<string[]>(v.flags_json, []),
-    hasPlaceholders: /\[CONFIRM:/i.test(v.body),
+    hasPlaceholders: /\[CONFIRM:/i.test(v.body), attachments: await filesFor("reply", draftId),
   };
 }
 
@@ -96,8 +106,8 @@ export async function confirmSend(draftId: string, token: string) {
   if (c.used_at) throw new SendConfirmationError("This confirmation was already used");
   if (new Date(c.expires_at).getTime() < Date.now()) throw new SendConfirmationError("Confirmation expired — review the draft again");
   const d = await db.selectFrom("drafts").selectAll().where("id", "=", draftId).executeTakeFirstOrThrow();
-  if (d.current_version_id !== c.version_id) throw new SendConfirmationError("The draft changed after you reviewed it — review again");
-  const v = await db.selectFrom("draft_versions").selectAll().where("id", "=", c.version_id).executeTakeFirstOrThrow();
+  if (!d.current_version_id || (await bindTo(d.current_version_id, "reply", draftId)) !== c.version_id) throw new SendConfirmationError("The draft changed after you reviewed it — review again");
+  const v = await db.selectFrom("draft_versions").selectAll().where("id", "=", d.current_version_id).executeTakeFirstOrThrow();
   if (/\[CONFIRM:/i.test(v.body)) throw new SendConfirmationError("The draft still contains [CONFIRM: …] placeholders");
   // mark used first so a double-tap cannot send twice
   const upd = await db.updateTable("send_confirmations").set({ used_at: now() }).where("id", "=", c.id).where("used_at", "is", null).executeTakeFirst();
@@ -111,6 +121,7 @@ export async function confirmSend(draftId: string, token: string) {
   await db.updateTable("drafts").set({ status: "sent", provider_draft_id: null, final_body: v.body,
     edit_class: orig && norm(orig.body) === norm(v.body) ? "unedited" : "edited", updated_at: now() }).where("id", "=", draftId).execute();
   await db.updateTable("threads").set({ state: "done", draft_status: "none", updated_at: now() }).where("id", "=", d.thread_id).execute();
+  await clearAttachments("reply", draftId);
   const t = await db.selectFrom("threads").select("provider_thread_id").where("id", "=", d.thread_id).executeTakeFirstOrThrow();
   await applyThreadLabels(acc, t.provider_thread_id, [], [AI_LABELS.review]).catch(() => undefined);
   await audit("user", "send", "draft", draftId, { version: v.version, provider_message_id: sent.messageId });

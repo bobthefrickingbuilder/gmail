@@ -3,7 +3,8 @@
  * To / Cc / Bcc autocomplete from your contacts. Your text autosaves here as
  * you type; "Save to Gmail" puts it in Gmail's Drafts folder too. Claude can
  * write or polish it from a one-line instruction (you review the result).
- * Send asks for confirmation first, like replies. The list on the left (or at
+ * Files and PDFs can be attached ("Attach files"). Send asks for
+ * confirmation first, like replies. The list on the left (or at
  * the top on phones) holds the new emails you haven't sent yet.
  */
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +15,7 @@ import { when } from "../format";
 import type { Address, ComposeDraft } from "../types";
 import { RecipientInput } from "../components/RecipientInput";
 import { SendDialog } from "../components/SendDialog";
+import { Attachments } from "../components/Attachments";
 
 export function ComposeList({ selected }: { selected?: string }) {
   const list = useApi<ComposeDraft[]>("/api/compose");
@@ -100,6 +102,7 @@ export function ComposeEditor({ id, split }: { id: string; split?: boolean }) {
           <label htmlFor="c-body" className="sr-only">Message</label>
           <textarea id="c-body" className="draft-editor" style={{ marginTop: ".7rem" }} rows={14} spellCheck value={body} placeholder="Write your email… (your Gmail signature is added automatically)"
             onChange={(e) => { setBody(e.target.value); patch({ body: e.target.value }); }} />
+          <Attachments kind="compose" owner={id} onChange={() => setSaved((s) => (s === "gmail" ? "saved" : s))} />
           {notes && notes.open_questions.length > 0 && <div className="small" style={{ marginTop: ".4rem" }}><strong>Check before sending:</strong><ul style={{ margin: ".2rem 0" }}>{notes.open_questions.map((q, i) => <li key={i}>{q}</li>)}</ul></div>}
           <div className="row" style={{ marginTop: ".7rem" }}>
             <button className="btn" disabled={!!busy} onClick={() => run("save", async () => { await flush(); await api(`/api/compose/${id}/save`, { method: "POST" }); setSaved("gmail"); toast("Saved to Gmail drafts"); })}>

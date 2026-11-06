@@ -8,7 +8,8 @@
  *   - Subject: "Re: <original>" (not "Re: Re:")
  *   - threadId on the Gmail API call (done by the caller)
  * We send a plain-text part and a simple HTML part (so the Gmail HTML
- * signature renders properly).
+ * signature renders properly). With attachments, those two parts are wrapped
+ * in multipart/mixed and each file follows as a base64 part.
  */
 import type { Address, ParsedMessage } from "./types.js";
 import { htmlToText } from "./parse.js";
@@ -88,6 +89,18 @@ export interface ReplyInput {
   /** Signature: plain text, or HTML from Gmail. */
   signatureText: string | null;
   signatureHtml: string | null;
+  /** Files to attach (PDFs, documents, images…). */
+  attachments?: MimeAttachment[];
+}
+
+export interface MimeAttachment { filename: string; mimeType: string; data: Buffer }
+
+/** RFC 2231 filename parameter for non-ASCII names, plain quoted otherwise. */
+function filenameParams(name: string): string {
+  const safe = name.replace(/[\r\n"\\]/g, "_");
+  if (!needsEncoding(safe)) return `filename="${safe}"`;
+  const ascii = safe.replace(/[^\x20-\x7e]/g, "_");
+  return `filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe).replace(/['()*!]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
 }
 
 /** Returns the full RFC 2822 message as a string (caller base64url-encodes for Gmail). */
@@ -106,11 +119,24 @@ export function buildReplyMime(r: ReplyInput, boundarySeed: string = crypto.rand
     ...(r.inReplyTo ? [`In-Reply-To: ${r.inReplyTo}`] : []),
     ...(r.references ? [`References: ${r.references}`] : []),
     "MIME-Version: 1.0",
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
   ];
   const part = (type: string, content: string) => [
     `--${boundary}`, `Content-Type: ${type}; charset="UTF-8"`, "Content-Transfer-Encoding: base64", "",
     wrap76(Buffer.from(content, "utf8").toString("base64")),
   ].join("\r\n");
-  return [...headers, "", part("text/plain", plain), part("text/html", html), `--${boundary}--`, ""].join("\r\n");
+  const alternative = [part("text/plain", plain), part("text/html", html), `--${boundary}--`].join("\r\n");
+  const files = r.attachments ?? [];
+  if (!files.length) {
+    return [...headers, `Content-Type: multipart/alternative; boundary="${boundary}"`, "", alternative, ""].join("\r\n");
+  }
+  const mixed = `${boundary}_mixed`;
+  const fileParts = files.map((f) => {
+    const type = /^[\w.+-]+\/[\w.+-]+$/.test(f.mimeType) ? f.mimeType : "application/octet-stream";
+    return [`--${mixed}`, `Content-Type: ${type}; name="${encodeHeaderWord(f.filename.replace(/[\r\n"\\]/g, "_"))}"`,
+      `Content-Disposition: attachment; ${filenameParams(f.filename)}`, "Content-Transfer-Encoding: base64", "",
+      wrap76(f.data.toString("base64"))].join("\r\n");
+  });
+  return [...headers, `Content-Type: multipart/mixed; boundary="${mixed}"`, "",
+    `--${mixed}`, `Content-Type: multipart/alternative; boundary="${boundary}"`, "", alternative,
+    ...fileParts, `--${mixed}--`, ""].join("\r\n");
 }

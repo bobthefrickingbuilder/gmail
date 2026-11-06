@@ -3,7 +3,8 @@
  * Edit the draft, see the model badge / confidence / flags / open questions,
  * switch model (Haiku → Sonnet → Opus), add an instruction, compare and
  * revert versions, choose reply vs reply-all and the signature, then
- * Save to Gmail, Copy, Open in Gmail, or Send (with a confirmation dialog).
+ * attach files, then Save to Gmail, Copy, Open in Gmail, or Send (with a
+ * confirmation dialog).
  */
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
@@ -13,6 +14,7 @@ import type { Address, ThreadDetail, Version } from "../types";
 import { CompareView } from "./CompareView";
 import { SendDialog } from "./SendDialog";
 import { RecipientInput } from "./RecipientInput";
+import { Attachments } from "./Attachments";
 
 /** Voice dictation hook (v1: uses the browser's speech recognition where available). */
 function useDictation(onText: (t: string) => void) {
@@ -105,6 +107,7 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
         </div>
         <label htmlFor="body" className="sr-only">Draft text</label>
         <textarea id="body" className="draft-editor" style={{ marginTop: ".6rem" }} value={body} onChange={(e) => onBodyChange(e.target.value)} rows={14} spellCheck lang={d.person?.language ?? undefined} />
+        <Attachments kind="reply" owner={draftId} sources={d.messages} />
         <div className="row small" style={{ marginTop: ".3rem" }}>
           <label className="inline" htmlFor="sig">Signature</label>
           <select id="sig" style={{ width: "auto" }} value={d.draft.signature_key ?? ""} onChange={(e) => run("sig", () => api(`/api/drafts/${draftId}`, { method: "PUT", body: { signature_key: e.target.value || null } }))}>

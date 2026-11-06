@@ -37,6 +37,7 @@ are stored as text so the same schema works in SQLite and Postgres.
 | `chat_conversations` | Chats with Claude (Chat tab) | `title`, `model_key`, `context_thread_id` (chat started from an email), `tainted` (1 once suspicious email text was seen: every change then asks first) |
 | `chat_messages` | Each chat message in order, append-only | `conversation_id`, `seq`, `role`, `content_json` (exactly what was sent to / received from the model), `ui_json` (what the screen shows) |
 | `chat_actions` | Changes the chat proposed that wait for your Confirm tap | `tool`, `input_json` (runs exactly this on Confirm), `summary`, `status` (`pending`/`done`/`cancelled`/`failed`), `reported` |
+| `draft_attachments` | Files you attach to a reply draft or a new email, kept until it is sent or discarded | `owner_kind` (`reply`/`compose`), `owner_id`, `filename`, `mime_type`, `size`, `sha256`, `data_b64` |
 
 Chats quote email text, so they follow the retention setting (a chat untouched for N days is deleted), are included in **Export**, and are deleted by **Wipe**.
 

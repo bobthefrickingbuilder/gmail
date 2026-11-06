@@ -10,6 +10,7 @@ import { getDb, now, uid, pj, j } from "../db/index.js";
 import { mailFor, getLlm } from "../providers/index.js";
 import { buildReplyMime } from "../mail/mime.js";
 import { resolveSignature } from "../drafting/signature.js";
+import { attachmentsForMime, clearAttachments } from "../drafting/attachments.js";
 import { buildComposePrompt, DEFAULT_OWNER } from "../drafting/prompt.js";
 import { DraftOutput } from "../providers/llm/schemas.js";
 import { postCheck } from "../drafting/postcheck.js";
@@ -86,6 +87,7 @@ export async function saveComposeToGmail(id: string): Promise<string> {
     from: { name: fromName, email: c.from_email }, to: pj<Address[]>(c.to_json, []), cc: pj<Address[]>(c.cc_json, []), bcc: pj<Address[]>(c.bcc_json, []),
     subject: c.subject.trim() || "(no subject)", inReplyTo: null, references: null,
     bodyText: c.body, signatureText: sig.text, signatureHtml: sig.html,
+    attachments: await attachmentsForMime("compose", id),
   });
   const mail = mailFor(acc);
   let draftId = c.provider_draft_id;
@@ -106,6 +108,7 @@ export async function discardCompose(id: string) {
     if (await mail.draftExists(c.provider_draft_id).catch(() => false)) await mail.deleteDraft(c.provider_draft_id);
   }
   await db.updateTable("compose_drafts").set({ status: "discarded", provider_draft_id: null, updated_at: now() }).where("id", "=", id).execute();
+  await clearAttachments("compose", id);
   await audit("user", "compose.discard", "compose", id);
   emit("compose", { id });
 }
