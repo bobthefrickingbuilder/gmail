@@ -16,7 +16,7 @@ interface S {
   notifications: { urgent: boolean; drafts: boolean; quiet_hours: { start: string; end: string } | null }; monthly_budget_usd: number; retention_days: number;
   idle_lock_minutes: number; theme: "system" | "light" | "dark"; timezone: string; reply_all_default: boolean; seed_months: number;
 }
-interface SettingsResp { settings: S; models: { default_draft_model: string; models: Record<string, { id: string; label: string; input_per_mtok: number; output_per_mtok: number }> };
+interface SettingsResp { settings: S; models: { default_draft_model: string; models: Record<string, { id: string; label: string; blurb?: string; input_per_mtok: number; output_per_mtok: number }> };
   signatures: { default: string; groups: Record<string, { label: string; text: string }>; prefer_gmail_signature: boolean }; categories: string[] }
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const list = (s: string) => s.split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
@@ -87,8 +87,8 @@ export function Settings() {
             <tbody>{models.map(([k, m]) => <tr key={k}><td>{m.label}</td><td><code>{m.id}</code></td><td className="num">{m.input_per_mtok} / {m.output_per_mtok}</td></tr>)}</tbody></table>
           <p className="small muted">Model IDs and prices live in config/models.json on the server.</p>
           <label htmlFor="dm">Default drafting model</label>
-          <select id="dm" value={s.default_model} onChange={(e) => save({ default_model: e.target.value })}>{models.map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}</select>
-          <label className="inline"><input type="checkbox" checked={s.start_on_sonnet} onChange={(e) => save({ start_on_sonnet: e.target.checked })} /> Start automatic drafts on Sonnet</label>
+          <select id="dm" value={s.default_model} onChange={(e) => save({ default_model: e.target.value })}>{models.map(([k, m]) => <option key={k} value={k}>{m.label}{m.blurb ? ` · ${m.blurb}` : ""}</option>)}</select>
+          <p className="small muted">Used for automatic drafts and as the starting choice on every draft. You can pick another model on any draft or new email.</p>
           <label className="inline"><input type="checkbox" checked={s.auto_draft} onChange={(e) => save({ auto_draft: e.target.checked })} /> Draft automatically when new mail arrives</label>
           <label className="inline"><input type="checkbox" checked={s.reply_all_default} onChange={(e) => save({ reply_all_default: e.target.checked })} /> Reply-all by default when others were copied</label>
           <label>Draft these categories automatically</label>

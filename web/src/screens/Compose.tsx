@@ -16,6 +16,7 @@ import type { Address, ComposeDraft } from "../types";
 import { RecipientInput } from "../components/RecipientInput";
 import { SendDialog } from "../components/SendDialog";
 import { Attachments } from "../components/Attachments";
+import { ModelPicker, type ModelOption } from "../components/ModelPicker";
 
 export function ComposeList({ selected }: { selected?: string }) {
   const list = useApi<ComposeDraft[]>("/api/compose");
@@ -48,6 +49,9 @@ export function ComposeEditor({ id, split }: { id: string; split?: boolean }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [instruction, setInstruction] = useState("");
+  const models = useApi<{ options: ModelOption[]; default: string }>("/api/models");
+  const [model, setModel] = useState<string | null>(null);
+  const chosen = model ?? models.data?.default ?? "sonnet";
   const [busy, setBusy] = useState<string | null>(null);
   const [saved, setSaved] = useState<"saved" | "saving" | "gmail" | null>(null);
   const [sending, setSending] = useState(false);
@@ -117,13 +121,14 @@ export function ComposeEditor({ id, split }: { id: string; split?: boolean }) {
 
         <div className="card ai-box">
           <h3>✨ Write it with Claude</h3>
+          {models.data && <div style={{ marginBottom: ".5rem" }}><ModelPicker id="m-compose" options={models.data.options} value={chosen} onChange={setModel} /></div>}
           <p className="small muted" style={{ marginTop: 0 }}>Say what the email should say. Claude writes it in your voice{body.trim() ? " and keeps the facts from what you've written" : ""}; you review before anything is sent.</p>
           <div className="row">
             <input type="text" aria-label="Instruction for Claude" placeholder='e.g. "ask if they can move rehearsal to Thursday, friendly"' value={instruction}
               onChange={(e) => setInstruction(e.target.value)} style={{ flex: 1 }} onKeyDown={(e) => { if (e.key === "Enter" && instruction.trim()) (e.currentTarget.nextElementSibling as HTMLButtonElement)?.click(); }} />
             <button className="btn primary" disabled={!!busy || !instruction.trim()} onClick={() => run("write", async () => {
               await flush();
-              const r = await api<{ compose: ComposeDraft; open_questions: string[]; confidence: string }>(`/api/compose/${id}/write`, { method: "POST", body: { instruction } });
+              const r = await api<{ compose: ComposeDraft; open_questions: string[]; confidence: string }>(`/api/compose/${id}/write`, { method: "POST", body: { instruction, model: chosen } });
               setBody(r.compose.body); setSubject(r.compose.subject); setNotes(r); setSaved("saved"); toast("Written — review it before sending");
             })}>{busy === "write" ? <><span className="spinner" /> Writing…</> : body.trim() ? "Polish" : "Write"}</button>
           </div>

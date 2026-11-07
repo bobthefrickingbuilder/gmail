@@ -8,7 +8,10 @@ import { getDb, now, j, pj } from "./db/index.js";
 import { loadModels, loadStyleGuideFile, loadTriageRules, loadSignatures, env } from "./config.js";
 
 export interface AppSettings {
+  /** Model for new drafts (automatic and by tap); you can pick another per draft. */
   default_model: string;
+  /** True once you choose a default in Settings; until then the default follows config/models.json. */
+  default_model_chosen: boolean;
   start_on_sonnet: boolean;
   escalation_rules: { senders: string[]; labels: string[]; categories: string[]; model: string };
   draft_categories: string[];
@@ -38,6 +41,7 @@ export function defaultSettings(): AppSettings {
   const rules = loadTriageRules();
   return {
     default_model: models.default_draft_model,
+    default_model_chosen: false,
     start_on_sonnet: false,
     escalation_rules: { senders: [], labels: [], categories: [], model: "sonnet" },
     draft_categories: rules.draft_categories,
@@ -66,7 +70,10 @@ export function defaultSettings(): AppSettings {
 export async function getSettings(): Promise<AppSettings> {
   const db = await getDb();
   const row = await db.selectFrom("settings").select("value_json").where("key", "=", "app").executeTakeFirst();
-  return { ...defaultSettings(), ...pj<Partial<AppSettings>>(row?.value_json, {}) };
+  const s = { ...defaultSettings(), ...pj<Partial<AppSettings>>(row?.value_json, {}) };
+  // A default you never picked yourself follows models.json (so a new recommended default reaches you).
+  if (!s.default_model_chosen) s.default_model = loadModels().default_draft_model;
+  return s;
 }
 
 export async function saveSettings(patch: Partial<AppSettings>): Promise<AppSettings> {

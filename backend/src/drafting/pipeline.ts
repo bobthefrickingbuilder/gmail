@@ -11,6 +11,7 @@
  *   5. label the thread, record cost, propose a profile update, notify the app
  * It never sends anything.
  */
+import { draftModelKey } from "./models.js";
 import { getDb, now, uid, j, pj } from "../db/index.js";
 import { getLlm } from "../providers/index.js";
 import { DraftOutput } from "../providers/llm/schemas.js";
@@ -145,7 +146,8 @@ export async function generateDraft(ctx: DraftContext, modelKey: string) {
 export async function draftThread(threadId: string, opts: DraftOptions) {
   const db = await getDb();
   const models = await getModels();
-  const modelKey = opts.modelKey ?? models.default_draft_model;
+  const defaultKey = await draftModelKey();
+  const modelKey = opts.modelKey ?? defaultKey;
   if (!models.models[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
   const ctx = await buildDraftContext(threadId, opts);
   const { thread, acc, target, existing, shareDetails, promptThread, person, replyMode, to, cc, fromEmail } = ctx;
@@ -185,7 +187,7 @@ export async function draftThread(threadId: string, opts: DraftOptions) {
   // ---- Gmail ----
   await writeDraftToGmail(draftId);
   const needsReview = output.confidence !== "high" || output.flags.length > 0 || output.open_questions.length > 0;
-  const add: string[] = [AI_LABELS.drafted, ...(needsReview ? [AI_LABELS.review] : []), ...(modelKey !== models.default_draft_model ? [AI_LABELS.escalated] : [])];
+  const add: string[] = [AI_LABELS.drafted, ...(needsReview ? [AI_LABELS.review] : []), ...(modelKey !== defaultKey ? [AI_LABELS.escalated] : [])];
   await applyThreadLabels(acc, thread.provider_thread_id, add, needsReview ? [] : [AI_LABELS.review]);
 
   await audit(opts.actor, existing ? "draft.redraft" : "draft.create", "thread", threadId,

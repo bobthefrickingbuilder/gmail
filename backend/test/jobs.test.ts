@@ -5,12 +5,12 @@ import { getDb } from "../src/db/index.js";
 import { startSeedJob, runSeedJob } from "../src/profiles/seed.js";
 import { runLearning, decideProposal } from "../src/learning/nightly.js";
 import { purgeOldBodies } from "../src/ops/retention.js";
-import { getStyleGuide, saveSettings } from "../src/settings.js";
+import { getSettings, getStyleGuide, saveSettings } from "../src/settings.js";
 import { safePayload, inQuietHours } from "../src/notify/push.js";
 import { AnthropicProvider } from "../src/providers/llm/anthropic.js";
 import { LlmOutputError, LlmRefusalError } from "../src/providers/llm/types.js";
 import { TriageOutput } from "../src/providers/llm/schemas.js";
-import { autoModelFor } from "../src/drafting/models.js";
+import { autoModelFor, buttonState, draftModelKey } from "../src/drafting/models.js";
 
 let ctx: Awaited<ReturnType<typeof setup>>;
 beforeEach(async () => { ctx = await setup(); });
@@ -92,11 +92,25 @@ describe("notifications", () => {
 
 describe("model selection", () => {
   it("auto-escalation rules", async () => {
-    expect(await autoModelFor({ fromEmail: "a@b.c", labels: [], category: "needs-reply", personEscalate: null, ruleEscalate: null })).toBe("haiku");
+    expect(await autoModelFor({ fromEmail: "a@b.c", labels: [], category: "needs-reply", personEscalate: null, ruleEscalate: null })).toBe("sonnet");
     await saveSettings({ escalation_rules: { senders: ["@publisher.example"], labels: [], categories: ["urgent"], model: "sonnet" } });
     expect(await autoModelFor({ fromEmail: "x@publisher.example", labels: [], category: "fyi", personEscalate: null, ruleEscalate: null })).toBe("sonnet");
     expect(await autoModelFor({ fromEmail: "a@b.c", labels: [], category: "urgent", personEscalate: null, ruleEscalate: null })).toBe("sonnet");
     expect(await autoModelFor({ fromEmail: "a@b.c", labels: [], category: "fyi", personEscalate: "opus", ruleEscalate: null })).toBe("opus");
+  });
+
+  it("your default drafting model: follows models.json until you pick one, then sticks", async () => {
+    expect((await getSettings()).default_model).toBe("sonnet");
+    // an old saved value you never chose yourself does not hold you back
+    await saveSettings({ default_model: "haiku" });
+    expect((await getSettings()).default_model).toBe("sonnet");
+    await saveSettings({ default_model: "opus", default_model_chosen: true });
+    expect(await draftModelKey()).toBe("opus");
+    expect(await autoModelFor({ fromEmail: "a@b.c", labels: [], category: "needs-reply", personEscalate: null, ruleEscalate: null })).toBe("opus");
+    const b = await buttonState("none");
+    expect(b).toMatchObject({ selected: "opus", default: "opus", current: null, primary: { label: "Draft with Opus" } });
+    expect(b.options.find((o) => o.key === "sonnet")?.blurb).toContain("Recommended");
+    expect((await buttonState("drafted:haiku")).primary.label).toBe("Redraft with Haiku");
   });
 });
 

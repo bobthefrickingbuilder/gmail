@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getDb, now, uid } from "../db/index.js";
-import { parse } from "../http.js";
+import { HttpError, parse } from "../http.js";
 import { getModels, getSettings, getSignatureConfig, getStyleGuide, getTriageRules, saveModelOverrides, saveSettings, saveSignatureConfig,
   saveStyleGuide, saveTriageRules, getSettingRaw } from "../settings.js";
 import { audit } from "../audit.js";
@@ -29,7 +29,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return {
       settings: await getSettings(),
       models: { default_draft_model: models.default_draft_model, escalation_order: models.escalation_order,
-        models: Object.fromEntries(Object.entries(models.models).map(([k, m]) => [k, { id: m.id, label: m.label, input_per_mtok: m.input_per_mtok, output_per_mtok: m.output_per_mtok }])) },
+        models: Object.fromEntries(Object.entries(models.models).map(([k, m]) => [k, { id: m.id, label: m.label, blurb: m.blurb, input_per_mtok: m.input_per_mtok, output_per_mtok: m.output_per_mtok }])) },
       triage_rules: await getTriageRules(),
       signatures: await getSignatureConfig(),
       categories: CATEGORIES,
@@ -37,6 +37,10 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
   app.put("/api/settings", async (req) => {
     const patch = parse(SettingsPatch, req.body);
+    if (patch.default_model !== undefined) {
+      if (!(await getModels()).models[patch.default_model]) throw new HttpError(400, `Unknown model "${patch.default_model}"`);
+      (patch as { default_model_chosen?: boolean }).default_model_chosen = true;
+    }
     const s = await saveSettings(patch);
     await audit("user", "settings.update", null, null, { keys: Object.keys(patch) });
     return s;

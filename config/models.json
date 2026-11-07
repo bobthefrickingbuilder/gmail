@@ -1,36 +1,49 @@
 {
   "_comment": "Model mapping. The ONLY place model IDs appear. Prices are USD per million tokens; update when Anthropic changes pricing.",
-  "default_draft_model": "haiku",
+  "default_draft_model": "sonnet",
   "triage_model": "haiku",
   "profile_model": "haiku",
   "learning_model": "sonnet",
   "chat_model": "opus",
-  "escalation_order": ["haiku", "sonnet", "opus"],
+  "escalation_order": [
+    "haiku",
+    "sonnet",
+    "opus"
+  ],
   "models": {
     "haiku": {
       "id": "claude-haiku-5-5",
       "label": "Haiku",
-      "input_per_mtok": 0.10,
-      "output_per_mtok": 0.50,
+      "input_per_mtok": 0.1,
+      "output_per_mtok": 0.5,
       "effort": "medium",
-      "serverFallback": false
+      "serverFallback": false,
+      "blurb": "Fastest and cheapest. Fine for quick, simple replies."
     },
     "sonnet": {
       "id": "claude-sonnet-5-5",
       "label": "Sonnet",
-      "input_per_mtok": 2.00,
-      "output_per_mtok": 10.00,
+      "input_per_mtok": 2.0,
+      "output_per_mtok": 10.0,
       "effort": "medium",
-      "serverFallback": true
+      "serverFallback": true,
+      "blurb": "Best balance of quality and cost. Recommended."
     },
     "opus": {
       "id": "claude-opus-5-5",
       "label": "Opus",
-      "input_per_mtok": 4.00,
-      "output_per_mtok": 20.00,
+      "input_per_mtok": 4.0,
+      "output_per_mtok": 20.0,
       "effort": "medium",
-      "serverFallback": true
+      "serverFallback": true,
+      "blurb": "Most careful writing for delicate or important emails. Costs about twice Sonnet."
     }
   },
-  "max_output_tokens": { "draft": 8000, "triage": 1500, "profile": 3000, "learn": 6000, "chat": 8000 }
+  "max_output_tokens": {
+    "draft": 8000,
+    "triage": 1500,
+    "profile": 3000,
+    "learn": 6000,
+    "chat": 8000
+  }
 }

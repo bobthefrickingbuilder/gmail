@@ -35,7 +35,7 @@ function Row({ t, selected, onChanged, i }: { t: ThreadRow; selected: boolean; o
     await api(`/api/threads/${t.id}/state`, { method: "POST", body }); onChanged();
   };
   const escalate = async () => {
-    const next = t.draft_status === "drafted:haiku" ? "sonnet" : t.draft_status === "drafted:sonnet" ? "opus" : "sonnet";
+    const next = t.draft_status === "drafted:haiku" ? "sonnet" : t.draft_status === "drafted:sonnet" || t.draft_status === "drafted:opus" ? "opus" : "sonnet";
     await api(`/api/threads/${t.id}/draft`, { method: "POST", body: { model: next } }); onChanged();
   };
   const sender = t.latest ? (t.latest.is_from_me ? "Me" : t.latest.from_name || t.latest.from_email) : t.person_name ?? "";

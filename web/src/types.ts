@@ -19,7 +19,10 @@ export interface Version {
   input_tokens: number; output_tokens: number; cost_usd: number; created_at: string;
 }
 export interface Slot { start: string; end: string; label: string }
-export interface ButtonState { primary: { action: string; model: string; label: string }; toggle: { model: string; label: string } | null; secondary: { action: string; model: string; label: string } | null }
+export interface ButtonState {
+  options: { key: string; label: string; blurb: string; default: boolean }[]; selected: string; default: string; current: string | null;
+  primary: { action: string; model: string; label: string };
+}
 export interface ThreadDetail {
   thread: { id: string; provider_thread_id: string; subject: string; state: string; category: string | null; priority: number | null; summary: string | null; urgent: boolean; scheduling: boolean; draft_status: string; person_id: string | null; unread: boolean };
   messages: Message[];

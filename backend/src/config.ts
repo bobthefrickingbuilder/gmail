@@ -84,6 +84,8 @@ export const ModelEntry = z.object({
   output_per_mtok: z.number(),
   effort: z.enum(["low", "medium", "high", "xhigh", "max"]).default("medium"),
   serverFallback: z.boolean().default(false),
+  /** One line shown under the model picker in the app. */
+  blurb: z.string().default(""),
 });
 export const ModelsConfig = z.object({
   default_draft_model: z.string(),

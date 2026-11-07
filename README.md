@@ -28,7 +28,7 @@ For real mail, follow **[docs/INSTALL.md](docs/INSTALL.md)**.
 
 ## How it works (one paragraph)
 
-Every 2 minutes the server asks Gmail what's new. Each email goes through **rules** (newsletters, no-reply and bulk mail are skipped for free), then a quick **Haiku** classification (needs reply, scheduling, urgent…). For reply-worthy mail, it gathers the thread, the person's profile, your style guide, a few of your past replies, and (only for scheduling) your free time slots. It asks Claude for a draft as structured JSON, checks it (no fabricated facts, no leaking your schedule, no extra sign-off), and saves it as a Gmail draft in the right thread. The app shows the draft with its confidence, open questions and flags. You edit, redraft with Sonnet or Opus, save, or send.
+Every 2 minutes the server asks Gmail what's new. Each email goes through **rules** (newsletters, no-reply and bulk mail are skipped for free), then a quick **Haiku** classification (needs reply, scheduling, urgent…). For reply-worthy mail, it gathers the thread, the person's profile, your style guide, a few of your past replies, and (only for scheduling) your free time slots. It asks Claude (Sonnet by default) for a draft as structured JSON, checks it (no fabricated facts, no leaking your schedule, no extra sign-off), and saves it as a Gmail draft in the right thread. The app shows the draft with its confidence, open questions and flags. You edit, redraft with any model (Haiku, Sonnet or Opus), save, or send.
 
 ## Chat with Claude
 

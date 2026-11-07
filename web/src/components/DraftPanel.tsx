@@ -1,7 +1,7 @@
 /**
  * DRAFT PANEL
  * Edit the draft, see the model badge / confidence / flags / open questions,
- * switch model (Haiku → Sonnet → Opus), add an instruction, compare and
+ * pick the model (Haiku, Sonnet or Opus) for each draft or redraft, add an instruction, compare and
  * revert versions, choose reply vs reply-all and the signature, then
  * attach files, then Save to Gmail, Copy, Open in Gmail, or Send (with a
  * confirmation dialog).
@@ -15,6 +15,7 @@ import { CompareView } from "./CompareView";
 import { SendDialog } from "./SendDialog";
 import { RecipientInput } from "./RecipientInput";
 import { Attachments } from "./Attachments";
+import { ModelPicker } from "./ModelPicker";
 
 /** Voice dictation hook (v1: uses the browser's speech recognition where available). */
 function useDictation(onText: (t: string) => void) {
@@ -30,7 +31,7 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
   const [to, setTo] = useState<Address[]>(d.draft?.to ?? []);
   const [cc, setCc] = useState<Address[]>(d.draft?.cc ?? []);
   const [instruction, setInstruction] = useState("");
-  const [startSonnet, setStartSonnet] = useState(false);
+  const [model, setModel] = useState(d.buttons.selected);
   const [busy, setBusy] = useState<string | null>(null);
   const [compare, setCompare] = useState<[Version, Version] | null>(null);
   const [sending, setSending] = useState(false);
@@ -39,6 +40,8 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
   const dictate = useDictation((t) => setInstruction((i) => (i ? `${i} ${t}` : t)));
 
   useEffect(() => { setBody(current?.body ?? ""); setSubject(current?.subject ?? ""); }, [current?.id]);
+  useEffect(() => { setModel(d.buttons.selected); }, [d.thread.id, d.buttons.selected]);
+  const modelName = (k: string) => d.buttons.options.find((o) => o.key === k)?.label ?? k;
   useEffect(() => { setTo(d.draft?.to ?? []); setCc(d.draft?.cc ?? []); }, [d.draft?.id, d.draft?.reply_mode, JSON.stringify(d.draft?.to)]);
   useEffect(() => { if (insertText) { setBody((b) => insertAvailability(b, insertText)); onInserted(); } }, [insertText]);
 
@@ -46,7 +49,7 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
     setBusy(label);
     try { await fn(); if (ok) flash(ok); reload(); } catch (e) { flash((e as Error).message, "error"); } finally { setBusy(null); }
   };
-  const draft = (model: string) => run("draft", () => api(`/api/threads/${d.thread.id}/draft`, { method: "POST", body: { model, instruction: instruction || null } }), `Drafted with ${modelLabel(model)}`);
+  const draft = (m: string) => run("draft", () => api(`/api/threads/${d.thread.id}/draft`, { method: "POST", body: { model: m, instruction: instruction || null } }), `Drafted with ${modelLabel(m)}`);
   const saveEdits = async (recips: { to?: Address[]; cc?: Address[] } = {}) => {
     if (!d.draft) return;
     const r = await api<{ queued?: boolean }>(`/api/drafts/${d.draft.id}`, { method: "PUT", offlineQueue: true, body: { body, subject, to: recips.to ?? to, cc: recips.cc ?? cc } });
@@ -59,17 +62,15 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
   };
 
   if (!d.draft || !current) {
-    const b = d.buttons;
     return (
       <section className="card" aria-label="Draft">
         <h3>No draft yet</h3>
         <label htmlFor="ins">Instruction (optional)</label>
         <div className="row"><input id="ins" type="text" placeholder="e.g. decline politely, firmer tone" value={instruction} onChange={(e) => setInstruction(e.target.value)} style={{ flex: 1 }} />
           {dictate && <button className="btn small" onClick={dictate} aria-label="Dictate instruction">🎤</button>}</div>
+        <div style={{ marginTop: ".6rem" }}><ModelPicker id="m-new" options={d.buttons.options} value={model} onChange={setModel} /></div>
         <div className="row" style={{ marginTop: ".6rem" }}>
-          <button className="btn primary" disabled={!!busy} onClick={() => draft(startSonnet && b.toggle ? b.toggle.model : b.primary.model)}>
-            {busy ? "Drafting…" : startSonnet && b.toggle ? "Draft with Sonnet" : b.primary.label}</button>
-          {b.toggle && <label className="inline"><input type="checkbox" checked={startSonnet} onChange={(e) => setStartSonnet(e.target.checked)} /> {b.toggle.label}</label>}
+          <button className="btn primary" disabled={!!busy} onClick={() => draft(model)}>{busy ? <><span className="spinner" /> Drafting with {modelName(model)}…</> : `Draft with ${modelName(model)}`}</button>
         </div>
         {msg && <p className={msg.kind === "error" ? "error-text" : "small"} role="status">{msg.text}</p>}
       </section>
@@ -134,9 +135,9 @@ export function DraftPanel({ d, reload, insertText, onInserted }: { d: ThreadDet
         <label htmlFor="ins2">Instruction (optional)</label>
         <div className="row"><input id="ins2" type="text" placeholder="e.g. decline politely, shorter, firmer tone" value={instruction} onChange={(e) => setInstruction(e.target.value)} style={{ flex: 1 }} />
           {dictate && <button className="btn small" onClick={dictate} aria-label="Dictate instruction">🎤</button>}</div>
+        <div style={{ marginTop: ".6rem" }}><ModelPicker id="m-re" options={d.buttons.options} value={model} onChange={setModel} /></div>
         <div className="row" style={{ marginTop: ".6rem" }}>
-          <button className="btn primary" disabled={!!busy} onClick={() => draft(d.buttons.primary.model)}>{busy === "draft" ? "Drafting…" : d.buttons.primary.label}</button>
-          {d.buttons.secondary && <button className="btn" disabled={!!busy} onClick={() => draft(d.buttons.secondary!.model)}>{d.buttons.secondary.label}</button>}
+          <button className="btn primary" disabled={!!busy} onClick={() => draft(model)}>{busy === "draft" ? <><span className="spinner" /> Drafting with {modelName(model)}…</> : `Redraft with ${modelName(model)}`}</button>
           <span className="spacer" />
           <button className="btn danger small" onClick={() => { if (confirm("Discard this draft? It will be deleted from Gmail drafts too.")) void run("discard", () => api(`/api/drafts/${draftId}`, { method: "DELETE" }), "Draft discarded"); }}>Discard</button>
         </div>

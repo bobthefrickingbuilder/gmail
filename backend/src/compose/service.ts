@@ -10,6 +10,7 @@ import { getDb, now, uid, pj, j } from "../db/index.js";
 import { mailFor, getLlm } from "../providers/index.js";
 import { buildReplyMime } from "../mail/mime.js";
 import { resolveSignature } from "../drafting/signature.js";
+import { draftModelKey } from "../drafting/models.js";
 import { attachmentsForMime, clearAttachments } from "../drafting/attachments.js";
 import { buildComposePrompt, DEFAULT_OWNER } from "../drafting/prompt.js";
 import { DraftOutput } from "../providers/llm/schemas.js";
@@ -123,7 +124,7 @@ export async function writeCompose(id: string, instruction: string, modelKey?: s
   const person = first ? await db.selectFrom("people").selectAll()
     .where("id", "in", db.selectFrom("person_addresses").select("person_id").where("email", "=", first)).executeTakeFirst() : undefined;
   const models = await getModels(); const s = await getSettings();
-  const key = modelKey ?? models.default_draft_model;
+  const key = modelKey && models.models[modelKey] ? modelKey : await draftModelKey();
   const fmt = (a: Address) => (a.name ? `${a.name} <${a.email}>` : a.email);
   const { system, user } = buildComposePrompt({ ownerDescription: DEFAULT_OWNER, styleGuide: await getStyleGuide(), profile: person ? toPromptProfile(person) : null,
     instruction, currentBody: c.body, subject: c.subject, to: to.map(fmt), cc: cc.map(fmt), today: todayString(s.timezone) });

@@ -1,5 +1,6 @@
 /**
  * DRAFT ROUTES
+ *   GET  /api/models                drafting models you can pick + your default
  *   GET  /api/drafts                every unsent draft: replies + new emails, newest first
  *   POST /api/threads/:id/draft     draft / redraft (model + optional instruction)
  *   PUT  /api/drafts/:id            your edits (new "user" version)
@@ -25,10 +26,14 @@ import { todayString } from "../time.js";
 import { postCheck } from "../drafting/postcheck.js";
 import { INJECTION_RE } from "../security/injection.js";
 import { listDrafts } from "../drafting/list.js";
+import { buttonState, draftModelKey } from "../drafting/models.js";
 
 const Address = z.object({ name: z.string().nullable(), email: z.string().email() });
 export async function draftRoutes(app: FastifyInstance) {
   const draftLimit = { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } };
+
+  /** The drafting models you can pick from, and your default. */
+  app.get("/api/models", async () => { const b = await buttonState("none"); return { options: b.options, default: b.default }; });
 
   app.get("/api/drafts", async (req) => {
     const q = parse(z.object({ kind: z.enum(["all", "reply", "new"]).default("all"), q: z.string().max(200).optional() }), req.query);
@@ -68,7 +73,7 @@ export async function draftRoutes(app: FastifyInstance) {
   app.post("/api/scratch", draftLimit, async (req) => {
     const b = parse(z.object({ text: z.string().min(1).max(30000), instruction: z.string().max(2000).optional(), model: z.string().optional() }), req.body);
     const models = await getModels(); const s = await getSettings();
-    const modelKey = b.model ?? models.default_draft_model;
+    const modelKey = b.model && models.models[b.model] ? b.model : await draftModelKey();
     const { system, user } = buildDraftPrompt({ ownerDescription: DEFAULT_OWNER, styleGuide: await getStyleGuide(), profile: null, pinnedDocs: [],
       thread: [{ fromName: "Shared text", fromEmail: "shared@local", isFromMe: false, date: new Date().toISOString(), subject: "Shared text", text: b.text, attachments: [] }],
       availability: null, shareScheduleDetails: false, instruction: b.instruction ?? null, examples: [], replyLanguageHint: null, today: todayString(s.timezone), recipients: { to: [], cc: [] } });

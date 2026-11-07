@@ -22,7 +22,7 @@ describe("worker: sync, triage, auto-draft", () => {
     expect(r.newMessages).toBe(18);
     expect((await threadBySubject("This week in choral")).state).toBe("skipped");
     expect((await threadBySubject("Reminder: dentist")).state).toBe("skipped");
-    expect((await threadBySubject("Messiah")).draft_status).toBe("drafted:haiku");
+    expect((await threadBySubject("Messiah")).draft_status).toBe("drafted:sonnet"); // default drafting model
     expect((await threadBySubject("Invoice")).draft_status).toBe("none");
     expect(ctx.mail.sent).toHaveLength(0); // the worker NEVER sends
     expect(ctx.mail.drafts.size).toBeGreaterThan(0);
@@ -93,19 +93,20 @@ describe("draft → redraft → edit → save → send flow", () => {
     const { call } = await authedServer();
     const t = await threadBySubject("Messiah");
     let d = (await call("GET", `/api/threads/${t.id}`)).json();
-    expect(d.buttons.primary.label).toBe("Draft with Haiku");
-    expect(d.buttons.toggle.label).toBe("Start on Sonnet");
+    expect(d.buttons.primary.label).toBe("Draft with Sonnet");
+    expect(d.buttons.options.map((o: { key: string }) => o.key)).toEqual(["haiku", "sonnet", "opus"]);
+    expect(d.buttons.default).toBe("sonnet");
 
-    await call("POST", `/api/threads/${t.id}/draft`, {});
+    await call("POST", `/api/threads/${t.id}/draft`, { model: "haiku" }); // any model can be picked
     d = (await call("GET", `/api/threads/${t.id}`)).json();
-    expect(d.buttons.primary.label).toBe("Redraft with Sonnet");
+    expect(d.buttons.primary.label).toBe("Redraft with Haiku"); // picker stays on the model you used
+    expect(d.buttons.selected).toBe("haiku");
     expect(d.versions[0].model_key).toBe("haiku");
     expect(d.scheduling).not.toBeNull();
 
     await call("POST", `/api/threads/${t.id}/draft`, { model: "sonnet", instruction: "decline politely" });
     d = (await call("GET", `/api/threads/${t.id}`)).json();
-    expect(d.buttons.primary.label).toBe("Redraft with Opus");
-    expect(d.buttons.secondary.label).toBe("Redraft");
+    expect(d.buttons.primary.label).toBe("Redraft with Sonnet");
     expect(d.versions.map((v: { model_key: string }) => v.model_key)).toEqual(["sonnet", "haiku"]);
     expect(d.versions[0].instruction).toBe("decline politely");
     expect(ctx.mail.drafts.size).toBe(1); // replaced, not duplicated
@@ -222,7 +223,7 @@ describe("no reply needed", () => {
   it("discards the draft (also in Gmail) and moves the thread to Done", async () => {
     await pollOnce();
     const t = await threadBySubject("Messiah");
-    expect(t.draft_status).toBe("drafted:haiku");
+    expect(t.draft_status).toBe("drafted:sonnet");
     const { call } = await authedServer();
     expect(ctx.mail.drafts.size).toBeGreaterThan(0);
     const before = ctx.mail.drafts.size;
@@ -260,5 +261,26 @@ describe("read / unread", () => {
     // Mark unread again
     await call("POST", `/api/threads/${a.id}/read`, { read: false });
     expect(((await call("GET", "/api/threads?view=all")).json() as { id: string; unread: boolean }[]).find((r) => r.id === a.id)?.unread).toBe(true);
+  });
+});
+
+describe("choosing the drafting model", () => {
+  it("Settings default applies to new drafts, any model can redraft, compose takes a model, unknown models are refused", async () => {
+    const { call } = await authedServer();
+    expect((await call("GET", "/api/models")).json().default).toBe("sonnet");
+    expect((await call("PUT", "/api/settings", { default_model: "nope" })).statusCode).toBe(400);
+    expect((await call("PUT", "/api/settings", { default_model: "opus" })).statusCode).toBe(200);
+    expect((await call("GET", "/api/models")).json().default).toBe("opus");
+    await pollOnce();
+    const t = await threadBySubject("Messiah");
+    expect(t.draft_status).toBe("drafted:opus");
+    await call("POST", `/api/threads/${t.id}/draft`, { model: "haiku" });
+    await call("POST", `/api/threads/${t.id}/draft`, { model: "sonnet" });
+    const d = (await call("GET", `/api/threads/${t.id}`)).json();
+    expect(d.versions.map((v: { model_key: string }) => v.model_key)).toEqual(["sonnet", "haiku", "opus"]);
+    const c = (await call("POST", "/api/compose", { to: [{ name: null, email: "x@example.org" }] })).json();
+    expect((await call("POST", `/api/compose/${c.id}/write`, { instruction: "say hi", model: "haiku" })).statusCode).toBe(200);
+    const usage = await (await getDb()).selectFrom("usage").select("model_key").orderBy("ts", "desc").executeTakeFirstOrThrow();
+    expect(usage.model_key).toBe("haiku");
   });
 });
