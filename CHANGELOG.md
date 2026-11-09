@@ -2,7 +2,7 @@
 
 All notable changes. Versions follow MAJOR.MINOR.PATCH and are shared by the server, the web app (PWA) and the Android APK.
 
-## [Unreleased]
+## [0.2.0] - 2026-11-09
 - **Pick the model for every draft:** a Haiku / Sonnet / Opus picker on each reply (first draft and redraft) and in "Write it with Claude" for new emails, with a one-line note on what each is good for. The picker starts on the model that wrote the current version, so redrafting keeps your choice. **Sonnet is now the default** for automatic and new drafts. Change it in Settings → Models & drafting. Every version still records which model wrote it, so you can compare and revert. "Always draft with" on a person now also offers Haiku.
 - **Attach files and PDFs to drafts:** "📎 Attach files" on every reply draft and new email opens your device's file picker (Files, Drive or Photos on iPad and Android). On desktop you can also drag files onto the box. Files someone sent you in the conversation can be re-attached with one tap. Attachments go into the Gmail draft and are listed in the Send confirmation. Gmail's 25 MB per email limit applies, and file types Gmail blocks (programs, scripts) are refused. Adding or removing a file after you reviewed the email needs a fresh review. Files are never sent to Claude.
 - **Android:** the app no longer crashes on launch when it was built without Firebase. The sign-in screen says what to check when it can't reach the server.
